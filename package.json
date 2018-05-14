@@ -1,0 +1,27 @@
+{
+  "name": "webmr-registry",
+  "version": "0.0.1",
+  "description": "registry.webmr.io",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/modulesio/webmr-service.git"
+  },
+  "author": "Avaer Kazmer <a@modules.io>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/modulesio/webmr-service/issues"
+  },
+  "homepage": "https://github.com/modulesio/webmr-service#readme",
+  "dependencies": {
+    "dockerode": "^2.5.4",
+    "express": "^4.16.3",
+    "http-proxy": "^1.16.2",
+    "tar-fs": "^1.16.0",
+    "tmp": "0.0.33",
+    "yarn": "^1.5.1"
+  }
+}

@@ -160,7 +160,7 @@ app.put('/p', (req, res, next) => {
       fs.readFile(packageJsonPath, (err, s) => {
         if (!err) {
           const packageJson = JSON.parse(s);
-          const {name, description = null, version = '0.0.1'} = packageJson;
+          const {name, version = '0.0.1', description = null, main = 'index.js'} = packageJson;
 
           console.log('install module', {name, version});
 
@@ -182,7 +182,10 @@ app.put('/p', (req, res, next) => {
           yarnProcess.on('exit', async code => {
             if (code === 0) {
               await rollup.rollup({
-                input: p,
+                input: path.join(p, main),
+                /* acorn: {
+                  allowHashBang: true,
+                }, */
                 plugins: [
                   rollupPluginNodeResolve({
                     main: true,

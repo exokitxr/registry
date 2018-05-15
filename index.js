@@ -23,13 +23,22 @@ const app = express();
 app.get('/', (req, res, next) => {
   res.end('Hello, webmr registry!\n');
 });
-app.get('/projects/:project*', (req, res, next) => {
-  res.set('Access-Control-Allow-Origin', '**');
-  res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.set('Access-Control-Allow-Credentials', 'true');
+app.get('/projects', (req, res, next) => {
+  _cors(req, res);
 
-  console.log('got project req params', req.params);
+  s3.listObjects({
+    Bucket: BUCKET,
+  }, (err, data) => {
+    if (!err) {
+      res.json(data);
+    } else {
+      res.status(500);
+      res.end(err.stack);
+    }
+  });
+});
+app.get('/projects/:project*', (req, res, next) => {
+  _cors(req, res);
 
   const {project} = req.params;
   const p = req.params[0];
@@ -45,8 +54,6 @@ app.get('/projects/:project*', (req, res, next) => {
       res.end(err.stack);
     }
   });
-
-  // res.json(Object.keys(bindings).map(k => bindings[k]));
 });
 const _uploadDirectory = (p, basePath, prefix) => new Promise((accept, reject) => {
   const fullPath = path.join(basePath, p);

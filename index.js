@@ -117,31 +117,38 @@ app.post('/l', bodyParserJson, (req, res, next) => {
           }
         });
       } else if (err.code === 'NoSuchKey') {
-        phash(req.body.password).hash((err, hash) => {
-          if (!err) {
-            const {email} = req.body;
-            const id = crypto.randomBytes(16).toString('base64');
+        const {email, password} = req.body;
 
-            s3.putObject({
-              Bucket: BUCKET,
-              Key: path.join('_users', email),
-              Body: JSON.stringify({id, email, hash}),
-            }, err => {
-              if (!err) {
-                res.json({
-                  id,
-                  email,
-                });
-              } else {
-                res.status(500);
-                res.end(err.stack);
-              }
-            });
-          } else {
-            res.status(500);
-            res.end(err.stack);
-          }
-        });
+        if (/^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$/.test(email)) {
+          phash(password).hash((err, hash) => {
+            if (!err) {
+              const {email} = req.body;
+              const id = crypto.randomBytes(16).toString('base64');
+
+              s3.putObject({
+                Bucket: BUCKET,
+                Key: path.join('_users', email),
+                Body: JSON.stringify({id, email, hash}),
+              }, err => {
+                if (!err) {
+                  res.json({
+                    id,
+                    email,
+                  });
+                } else {
+                  res.status(500);
+                  res.end(err.stack);
+                }
+              });
+            } else {
+              res.status(500);
+              res.end(err.stack);
+            }
+          });
+        } else {
+          res.status(400);
+          res.end(http.STATUS_CODES[400]);
+        }
       } else {
         res.status(500);
         res.end(err.stack);

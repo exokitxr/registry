@@ -29,6 +29,7 @@ app.get('/p', (req, res, next) => {
 });
 const _uploadDirectory = (p, basePath, prefix) => new Promise((accept, reject) => {
   const fullPath = path.join(basePath, p);
+
   fs.readdir(fullPath, async (err, files) => {
     if (!err) {
       if (files.length > 0) {
@@ -36,14 +37,18 @@ const _uploadDirectory = (p, basePath, prefix) => new Promise((accept, reject) =
           const p2 = path.join(p, fileName);
           const fullPath2 = path.join(basePath, p2);
 
-          if (fs.lstatSync(fullPath2).isDirectory()) {
-            await _uploadDirectory(p2, basePath, prefix);
-          } else {
-            await _uploadFile(p, basePath, prefix);
-          }
+          await new Promise((accept, reject) => {
+            fs.lstat(fullPath2, (err, stats) => {
+              if (stats.isDirectory()) {
+                _uploadDirectory(p2, basePath, prefix)
+                  .then(accept, reject);
+              } else {
+                _uploadFile(p2, basePath, prefix)
+                  .then(accept, reject);
+              }
+            });
+          });
         }
-
-        console.log('done');
 
         accept();
       } else {

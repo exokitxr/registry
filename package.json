@@ -18,11 +18,12 @@
   },
   "homepage": "https://github.com/modulesio/webmr-service#readme",
   "dependencies": {
-    "aws-sdk": "^2.238.1",
+    "aws-sdk": "^2.239.1",
     "express": "^4.16.3",
-    "http-proxy": "^1.16.2",
-    "tar-fs": "^1.16.0",
+    "http-proxy": "^1.17.0",
+    "semver": "^5.5.0",
+    "tar-fs": "^1.16.2",
     "tmp": "0.0.33",
-    "yarn": "^1.5.1"
+    "yarn": "^1.6.0"
   }
 }

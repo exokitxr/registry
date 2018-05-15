@@ -11,7 +11,6 @@ const tmp = require('tmp');
 const tarFs = require('tar-fs');
 const httpProxy = require('http-proxy');
 const yarnPath = require.resolve('yarn/bin/yarn.js');
-const Docker = require('dockerode');
 const AWS = require('aws-sdk');
 
 const port = process.env['PORT'] || 8000;

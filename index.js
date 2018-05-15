@@ -566,7 +566,7 @@ app.get('/*', (req, res, next) => {
       }
       const isDirectory = s => /\/$/.test(s);
       const pHtml = (() => {
-        let result = '';
+        let result = `/<a href="${encodeURI(HOST)}/">root</a>/`;
         const components = p.split('/');
         let acc = `${HOST}/`;
         for (let i = 0; i < components.length; i++) {
@@ -580,7 +580,7 @@ app.get('/*', (req, res, next) => {
         }
         return result;
       })();
-      let html = `<!doctype html><html><body><h1>/${pHtml}</h1>`;
+      let html = `<!doctype html><html><body><h1>${pHtml}</h1>`;
       files.sort((a, b) => {
         const diff = +isDirectory(b) - +isDirectory(a);
         if (diff !== 0) {

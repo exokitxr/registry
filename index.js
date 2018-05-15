@@ -184,9 +184,6 @@ app.put('/p', (req, res, next) => {
               await (main ?
                 rollup.rollup({
                   input: path.join(p, main),
-                  /* acorn: {
-                    allowHashBang: true,
-                  }, */
                   plugins: [
                     rollupPluginNodeResolve({
                       main: true,

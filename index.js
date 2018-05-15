@@ -218,6 +218,8 @@ app.put('/p', (req, res, next) => {
                 .then(([codeEs, codeCjs]) => {
                   console.log('upload module', {name, version});
 
+                  const mainName = main.replace(/\.[^\/]+$/, '');
+
                   return Promise.all([
                     (async () => {
                       const ig = await _getIgnore(p);
@@ -226,7 +228,7 @@ app.put('/p', (req, res, next) => {
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
-                        Key: path.join('_builds', `${name}/${version}/${name}.mjs`),
+                        Key: path.join(name, version, `${mainName}.mjs`),
                         Body: codeEs,
                       }, err => {
                         if (!err) {
@@ -239,7 +241,7 @@ app.put('/p', (req, res, next) => {
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
-                        Key: path.join('_builds', `${name}/${version}/${name}.js`),
+                        Key: path.join(name, version, `${mainName}.js`),
                         Body: codeCjs,
                       }, err => {
                         if (!err) {

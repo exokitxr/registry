@@ -11,6 +11,7 @@ const tmp = require('tmp');
 const tarFs = require('tar-fs');
 const httpProxy = require('http-proxy');
 const yarnPath = require.resolve('yarn/bin/yarn.js');
+const semver = require('semver');
 const AWS = require('aws-sdk');
 
 const port = process.env['PORT'] || 8000;
@@ -76,10 +77,10 @@ const _uploadFile = (p, basePath, prefix) => new Promise((accept, reject) => {
     }
   });
 });
-app.put('/projects/:username/:module', (req, res, next) => {
-  const {username, module} = req.params;
+app.put('/projects/:module', (req, res, next) => {
+  const {module} = req.params;
 
-  if (/^[a-z0-9]+$/i.test(username) && /^[a-z0-9\-]+$/i.test(module)) {
+  if (/^[a-z0-9\-]+$/i.test(module)) {
     tmp.dir((err, p, cleanup) => {
       const us = req.pipe(zlib.createGunzip());
       us.on('error', err => {
@@ -95,8 +96,7 @@ app.put('/projects/:username/:module', (req, res, next) => {
         fs.readFile(packageJsonPath, (err, s) => {
           if (!err) {
             const packageJson = JSON.parse(s);
-            const {description = null} = packageJson;
-            const version = '0.0.1'; // XXX support multiple versions
+            const {description = null, version = '0.0.1'} = packageJson;
 
             const yarnProcess = child_process.spawn(
               process.argv[0],
@@ -114,10 +114,8 @@ app.put('/projects/:username/:module', (req, res, next) => {
             yarnProcess.stdout.pipe(process.stdout);
             yarnProcess.stderr.pipe(process.stderr);
             yarnProcess.on('exit', async code => {
-              console.log('yarn exit code', code);
-
               if (code === 0) {
-                _uploadDirectory('/', p, `${username}/${module}`)
+                _uploadDirectory('/', p, `${module}/${version}`)
                   .then(() => {
                     res.json({
                       username,

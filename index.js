@@ -343,10 +343,6 @@ app.put('/p', (req, res, next) => {
                                   strict: false,
                                 }).then(result => result.code),
                               ]))
-                              .catch(err => {
-                                console.warn('build error', err.stack);
-                                return Promise.resolve([null, null]);
-                              })
                               .then(([codeEs, codeCjs]) => {
                                 const fileName = fileSpec[0].replace(/\.[^\/]+$/, '');
 

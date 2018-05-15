@@ -27,7 +27,8 @@ const s3 = new AWS.S3();
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
-const FILES_HOST = 'files.webmr.io';
+const HOST = 'https://registry.webmr.io';
+const FILES_HOST = 'https://files.webmr.io';
 
 const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {
   s3.getObject({
@@ -514,7 +515,7 @@ app.put('/f*', (req, res, next) => {
         }, (err, data) => {
           if (!err) {
             res.json({
-              url: 'https://' + FILES_HOST + '/' + key,
+              url: FILES_HOST + '/' + key,
             });
           } else {
             res.status(500);
@@ -558,14 +559,31 @@ app.get('/*', (req, res, next) => {
         }
       }
       const isDirectory = s => /\/$/.test(s);
-      res.json(files.sort((a, b) => {
+      let html = `<!doctype html><html><body><h1>/${p}</h1>`;
+      files.sort((a, b) => {
         const diff = +isDirectory(b) - +isDirectory(a);
         if (diff !== 0) {
           return diff;
         } else {
           return a.localeCompare(b);
         }
-      }));
+      });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        let uri;
+        let text;
+        if (isDirectory(file)) {
+          uri = encodeURI(`${HOST}/${file}`);
+          text = '📁\xa0/' + escape(file);
+        } else {
+          uri = encodeURI(`${FILES_HOST}/${file}`);
+          text = '💾\xa0/' + escape(file);
+        }
+        html += `<a href="${uri}">${text}</a><br>`;
+      }
+      html += `</body></html>`;
+      res.type('text/html');
+      res.end(html);
     } else {
       res.status(500);
       res.end(err.stack);

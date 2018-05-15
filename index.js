@@ -236,7 +236,7 @@ app.put('/p', (req, res, next) => {
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
-                        Key: pth.join('_builds', `${name}/${version}/${name}.js`),
+                        Key: path.join('_builds', `${name}/${version}/${name}.js`),
                         Body: codeCjs,
                       }, err => {
                         if (!err) {

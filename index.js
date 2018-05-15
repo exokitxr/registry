@@ -90,7 +90,7 @@ const _getIgnore = p => Promise.all([
     return Promise.resolve(ig);
   });
 const _uploadDirectory = (p, basePath, ig, prefix) => new Promise((accept, reject) => {
-  if (!ig.ignores(p)) {
+  if (!ig.ignores(p) && !/^\/\.git\//.test(p)) {
     const fullPath = path.join(basePath, p);
 
     fs.readdir(fullPath, async (err, files) => {
@@ -126,7 +126,7 @@ const _uploadDirectory = (p, basePath, ig, prefix) => new Promise((accept, rejec
   }
 });
 const _uploadFile = (p, basePath, ig, prefix) => new Promise((accept, reject) => {
-  if (!ig.ignores(p)) {
+  if (!ig.ignores(p) && !/^\/\.git\//.test(p)) {
     const fullPath = path.join(basePath, p);
 
     s3.upload({

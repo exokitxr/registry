@@ -601,7 +601,8 @@ app.put('/f*', (req, res, next) => {
     _requestUserFromCredentials(email, password)
       .then(() => {
         const p = req.params[0];
-        const key = path.join('_files', email, meaningful().toLowerCase(), p);
+        const keypath = path.join(email, meaningful().toLowerCase(), p);
+        const key = path.join('_files', keypath);
 
         s3.upload({
           Bucket: BUCKET,
@@ -610,7 +611,7 @@ app.put('/f*', (req, res, next) => {
         }, (err, data) => {
           if (!err) {
             res.json({
-              path: key,
+              path: path.join('/', 'f', keypath),
             });
           } else {
             res.status(500);

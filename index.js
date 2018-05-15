@@ -11,6 +11,7 @@ const express = require('express');
 const tmp = require('tmp');
 const bodyParser = require('body-parser');
 const bodyParserJson = bodyParser.json();
+const mime = require('mime');
 const phash = require('password-hash-and-salt');
 const tarFs = require('tar-fs');
 const promiseConcurrency = require('promise-concurrency');
@@ -76,6 +77,7 @@ const _setProject = (project, projectSpec) => new Promise((accept, reject) => {
   s3.putObject({
     Bucket: BUCKET,
     Key: path.join('_projects', project),
+    ContentType: 'application/json',
     Body: JSON.stringify(projectSpec),
   }, err => {
     if (!err) {
@@ -128,6 +130,7 @@ app.post('/l', bodyParserJson, (req, res, next) => {
               s3.putObject({
                 Bucket: BUCKET,
                 Key: path.join('_users', email),
+                ContentType: 'application/json',
                 Body: JSON.stringify({id, email, hash}),
               }, err => {
                 if (!err) {
@@ -235,6 +238,7 @@ const _uploadModule = (p, basePath, ig, prefix) => {
       s3.upload({
         Bucket: BUCKET,
         Key: path.join(prefix, p),
+        ContentType: mime.getType(p),
         Body: fs.createReadStream(fullPath),
       }, err => {
         if (!err) {
@@ -384,6 +388,7 @@ app.put('/p', (req, res, next) => {
                                     s3.putObject({
                                       Bucket: BUCKET,
                                       Key: path.join(name, version, `${fileName}.mjs`),
+                                      ContentType: 'application/javascript',
                                       Body: codeEs,
                                     }, err => {
                                       if (!err) {
@@ -397,6 +402,7 @@ app.put('/p', (req, res, next) => {
                                     s3.putObject({
                                       Bucket: BUCKET,
                                       Key: path.join(name, version, `${fileName}.js`),
+                                      ContentType: 'application/javascript',
                                       Body: codeCjs,
                                     }, err => {
                                       if (!err) {
@@ -578,7 +584,6 @@ app.get('/f*', (req, res, next) => {
   objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
     res.status(statusCode);
     res.set(headers);
-    res.type(extname);
   });
   const rs = objectStream.createReadStream();
   rs.pipe(res);
@@ -607,6 +612,7 @@ app.put('/f*', (req, res, next) => {
         s3.upload({
           Bucket: BUCKET,
           Key: key,
+          ContentType: mime.getType(p),
           Body: req,
         }, (err, data) => {
           if (!err) {
@@ -658,7 +664,6 @@ app.get('/:project/:version*', (req, res, next) => {
   objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
     res.status(statusCode);
     res.set(headers);
-    res.type(extname);
   });
   const rs = objectStream.createReadStream();
   rs.pipe(res);

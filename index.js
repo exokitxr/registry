@@ -45,7 +45,7 @@ const _uploadDirectory = (p, basePath, prefix) => new Promise((accept, reject) =
           if (fs.lstatSync(fullPath2).isDirectory()) {
             await _uploadDirectory(p2, basePath, prefix);
           } else {
-            await _uploadFile(p, prefix);
+            await _uploadFile(p, basePath, prefix);
           }
         }
 

@@ -416,7 +416,7 @@ app.put('/f*', (req, res, next) => {
 });
 app.get('/:project/:version*', (req, res, next) => {
   const {project, version} = req.params;
-  const p = req.params[0];
+  const p = req.params[0] || 'index.html';
   let extname = path.extname(p);
   if (extname) {
     extname = extname.slice(1);

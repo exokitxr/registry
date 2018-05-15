@@ -13,7 +13,7 @@ const httpProxy = require('http-proxy');
 const yarnPath = require.resolve('yarn/bin/yarn.js');
 const rollup = require('rollup');
 const rollupPluginNodeResolve = require('rollup-plugin-node-resolve');
-const rollupPluginCommonJsAsync = require('rollup-plugin-commonjs-async');
+const rollupPluginCommonJs = require('rollup-plugin-commonjs');
 const rollupPluginJson = require('rollup-plugin-json');
 // const semver = require('semver');
 const ignore = require('ignore');
@@ -188,7 +188,7 @@ app.put('/p', (req, res, next) => {
                     main: true,
                     preferBuiltins: false,
                   }),
-                  rollupPluginCommonJsAsync(),
+                  rollupPluginCommonJs(),
                   rollupPluginJson(),
                 ],
               })

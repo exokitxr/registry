@@ -23,13 +23,28 @@ const app = express();
 app.get('/', (req, res, next) => {
   res.end('Hello, webmr registry!\n');
 });
-app.get('/projects*', (req, res, next) => {
+app.get('/projects/:project*', (req, res, next) => {
   res.set('Access-Control-Allow-Origin', '**');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Allow-Credentials', 'true');
 
   console.log('got project req params', req.params);
+
+  const {project} = req.params;
+  const p = req.params[0];
+
+  s3.listObjects({
+    Bucket: BUCKET,
+    Prefix: path.join(project, p),
+  }, (err, data) => {
+    if (!err) {
+      res.json(data);
+    } else {
+      res.status(500);
+      res.end(err.stack);
+    }
+  });
 
   // res.json(Object.keys(bindings).map(k => bindings[k]));
 });

@@ -351,6 +351,32 @@ app.put('/f*', (req, res, next) => {
     }
   });
 });
+app.get('/:project/:version*', (req, res, next) => {
+  const {project, version} = req.params;
+  const p = req.params[0];
+  let extname = path.extname(p);
+  if (extname) {
+    extname = extname.slice(1);
+  } else {
+    extname = 'application/octet-stream';
+  }
+
+  const rs = s3.getObject({
+    Bucket: BUCKET,
+    Key: path.join(project, version, p),
+  }).createReadStream();
+  res.type(extname);
+  rs.pipe(res);
+  rs.on('error', err => {
+    if (err.code === 'ENOENT') {
+      res.stats(404);
+      res.end(http.STATUS_CODES[404]);
+    } else {
+      res.status(500);
+      res.end(err.stack);
+    }
+  });
+});
 const _cors = (req, res) => {
   res.set('Access-Control-Allow-Origin', '**');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

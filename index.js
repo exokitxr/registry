@@ -343,6 +343,31 @@ app.put('/p', (req, res, next) => {
     next();
   }
 }); */
+app.get('/f*', (req, res, next) => {
+  const p = req.params[0];
+  let extname = path.extname(p);
+  if (extname) {
+    extname = extname.slice(1);
+  } else {
+    extname = 'application/octet-stream';
+  }
+
+  const rs = s3.getObject({
+    Bucket: BUCKET,
+    Key: path.join('_files', p),
+  }).createReadStream();
+  res.type(extname);
+  rs.pipe(res);
+  rs.on('error', err => {
+    if (err.code === 'NoSuchKey') {
+      res.status(404);
+      res.end(http.STATUS_CODES[404]);
+    } else {
+      res.status(500);
+      res.end(err.stack);
+    }
+  });
+});
 app.put('/f*', (req, res, next) => {
   const p = req.params[0];
   const key = path.join('_files', meaningful().toLowerCase(), p);

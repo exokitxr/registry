@@ -268,171 +268,192 @@ const _uploadModule = (p, basePath, ig, prefix) => {
     });
 };
 app.put('/p', (req, res, next) => {
-  tmp.dir((err, p, cleanup) => {
-    const us = req.pipe(zlib.createGunzip());
-    us.on('error', err => {
-      res.status(500);
-      res.end(err.stack);
-      cleanup();
-    });
-    const ws = us.pipe(tarFs.extract(p));
+  const authorization = req.get('authorization') || '';
+  const basic = authorization.match(/^Basic\s+(.+)$/i)[1];
+  if (basic) {
+    const [email, password] = Buffer.from(basic, 'base64').toString('utf8').split(':');
 
-    ws.on('finish', () => {
-      const packageJsonPath = path.join(p, 'package.json');
-
-      fs.readFile(packageJsonPath, (err, s) => {
-        if (!err) {
-          const packageJson = JSON.parse(s);
-          const {name, version = '0.0.1', description = null, main, browser} = packageJson;
-
-          console.log('install module', {name, version});
-
-          const yarnProcess = child_process.spawn(
-            process.argv[0],
-            [
-              yarnPath,
-              'install',
-              '--production',
-              '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
-            ],
-            {
-              cwd: p,
-              env: process.env,
-            }
-          );
-          yarnProcess.stdout.pipe(process.stdout);
-          yarnProcess.stderr.pipe(process.stderr);
-          yarnProcess.on('exit', async code => {
-            if (code === 0) {
-              const _bundleAndUploadFile = fileSpec => rollup.rollup({
-                input: path.join(p, fileSpec[1]),
-                plugins: [
-                  rollupPluginNodeResolve({
-                    main: true,
-                    preferBuiltins: false,
-                  }),
-                  rollupPluginCommonJs(),
-                  rollupPluginJson(),
-                ],
-                /* output: {
-                  name,
-                }, */
-              })
-                .then(bundle => Promise.all([
-                  bundle.generate({
-                    name: module,
-                    format: 'es',
-                    strict: false,
-                  }).then(result => result.code),
-                  bundle.generate({
-                    name: module,
-                    format: 'cjs',
-                    strict: false,
-                  }).then(result => result.code),
-                ]))
-                .catch(err => {
-                  console.warn('build error', err.stack);
-                  return Promise.resolve([null, null]);
-                })
-                .then(([codeEs, codeCjs]) => {
-                  const fileName = fileSpec[0].replace(/\.[^\/]+$/, '');
-
-                  return Promise.all([
-                    new Promise((accept, reject) => {
-                      s3.putObject({
-                        Bucket: BUCKET,
-                        Key: path.join(name, version, `${fileName}.mjs`),
-                        Body: codeEs,
-                      }, err => {
-                        if (!err) {
-                          accept();
-                        } else {
-                          reject(err);
-                        }
-                      });
-                    }),
-                    new Promise((accept, reject) => {
-                      s3.putObject({
-                        Bucket: BUCKET,
-                        Key: path.join(name, version, `${fileName}.js`),
-                        Body: codeCjs,
-                      }, err => {
-                        if (!err) {
-                          accept();
-                        } else {
-                          reject(err);
-                        }
-                      });
-                    }),
-                  ])
-                })
-                .then(() => {});
-
-              const bundleFiles = (main ? [[main, main]] : [])
-                .concat(typeof browser === 'object' ?
-                    Object.keys(browser).map(k => {
-                      const v = browser[k];
-                      if (v) {
-                        if (typeof v === 'string') {
-                          return [k, v];
-                        } else {
-                          return [k, k];
-                        }
-                      } else {
-                        return null;
-                      }
-                    }).filter(browserFile => browserFile !== null)
-                  :
-                    []
-                );
-
-              await Promise.all(
-                [(async () => {
-                  const ig = await _getIgnore(p, main, browser);
-                  await _uploadModule('/', p, ig, `${name}/${version}`);
-                })()]
-                  .concat(bundleFiles.map(fileSpec => _bundleAndUploadFile(fileSpec)))
-              )
-                .then(() => {
-                  res.json({
-                    name,
-                    version,
-                    description,
-                    files: bundleFiles.map(fileSpec => fileSpec[0]),
-                  });
-                  cleanup();
-                })
-                .catch(err => {
-                  res.status(500);
-                  res.end(err.stack);
-                  cleanup();
-                });
-            } else {
-              res.status(500);
-              res.end(new Error('npm publish exited with status code ' + code).stack);
-              cleanup();
-            }
+    _requestUserFromCredentials(email, password)
+      .then(() => {
+        tmp.dir((err, p, cleanup) => {
+          const us = req.pipe(zlib.createGunzip());
+          us.on('error', err => {
+            res.status(500);
+            res.end(err.stack);
+            cleanup();
           });
-        } else if (err.code === 'ENOENT') {
-          res.status(400);
-          res.end(http.STATUS_CODES[400]);
-          cleanup();
+          const ws = us.pipe(tarFs.extract(p));
+
+          ws.on('finish', () => {
+            const packageJsonPath = path.join(p, 'package.json');
+
+            fs.readFile(packageJsonPath, (err, s) => {
+              if (!err) {
+                const packageJson = JSON.parse(s);
+                const {name, version = '0.0.1', description = null, main, browser} = packageJson;
+
+                console.log('install module', {name, version});
+
+                const yarnProcess = child_process.spawn(
+                  process.argv[0],
+                  [
+                    yarnPath,
+                    'install',
+                    '--production',
+                    '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
+                  ],
+                  {
+                    cwd: p,
+                    env: process.env,
+                  }
+                );
+                yarnProcess.stdout.pipe(process.stdout);
+                yarnProcess.stderr.pipe(process.stderr);
+                yarnProcess.on('exit', async code => {
+                  if (code === 0) {
+                    const _bundleAndUploadFile = fileSpec => rollup.rollup({
+                      input: path.join(p, fileSpec[1]),
+                      plugins: [
+                        rollupPluginNodeResolve({
+                          main: true,
+                          preferBuiltins: false,
+                        }),
+                        rollupPluginCommonJs(),
+                        rollupPluginJson(),
+                      ],
+                      /* output: {
+                        name,
+                      }, */
+                    })
+                      .then(bundle => Promise.all([
+                        bundle.generate({
+                          name: module,
+                          format: 'es',
+                          strict: false,
+                        }).then(result => result.code),
+                        bundle.generate({
+                          name: module,
+                          format: 'cjs',
+                          strict: false,
+                        }).then(result => result.code),
+                      ]))
+                      .catch(err => {
+                        console.warn('build error', err.stack);
+                        return Promise.resolve([null, null]);
+                      })
+                      .then(([codeEs, codeCjs]) => {
+                        const fileName = fileSpec[0].replace(/\.[^\/]+$/, '');
+
+                        return Promise.all([
+                          new Promise((accept, reject) => {
+                            s3.putObject({
+                              Bucket: BUCKET,
+                              Key: path.join(name, version, `${fileName}.mjs`),
+                              Body: codeEs,
+                            }, err => {
+                              if (!err) {
+                                accept();
+                              } else {
+                                reject(err);
+                              }
+                            });
+                          }),
+                          new Promise((accept, reject) => {
+                            s3.putObject({
+                              Bucket: BUCKET,
+                              Key: path.join(name, version, `${fileName}.js`),
+                              Body: codeCjs,
+                            }, err => {
+                              if (!err) {
+                                accept();
+                              } else {
+                                reject(err);
+                              }
+                            });
+                          }),
+                        ])
+                      })
+                      .then(() => {});
+
+                    const bundleFiles = (main ? [[main, main]] : [])
+                      .concat(typeof browser === 'object' ?
+                          Object.keys(browser).map(k => {
+                            const v = browser[k];
+                            if (v) {
+                              if (typeof v === 'string') {
+                                return [k, v];
+                              } else {
+                                return [k, k];
+                              }
+                            } else {
+                              return null;
+                            }
+                          }).filter(browserFile => browserFile !== null)
+                        :
+                          []
+                      );
+
+                    await Promise.all(
+                      [(async () => {
+                        const ig = await _getIgnore(p, main, browser);
+                        await _uploadModule('/', p, ig, `${name}/${version}`);
+                      })()]
+                        .concat(bundleFiles.map(fileSpec => _bundleAndUploadFile(fileSpec)))
+                    )
+                      .then(() => {
+                        res.json({
+                          name,
+                          version,
+                          description,
+                          files: bundleFiles.map(fileSpec => fileSpec[0]),
+                        });
+                        cleanup();
+                      })
+                      .catch(err => {
+                        res.status(500);
+                        res.end(err.stack);
+                        cleanup();
+                      });
+                  } else {
+                    res.status(500);
+                    res.end(new Error('npm publish exited with status code ' + code).stack);
+                    cleanup();
+                  }
+                });
+              } else if (err.code === 'ENOENT') {
+                res.status(400);
+                res.end(http.STATUS_CODES[400]);
+                cleanup();
+              } else {
+                res.status(500);
+                res.end(err.stack);
+                cleanup();
+              }
+            });
+          });
+          req.on('error', err => {
+            res.status(500);
+            res.end(err.stack);
+            cleanup();
+          });
+        }, {
+          keep: true,
+          unsafeCleanup: true,
+        })
+      })
+      .catch(err => {
+        if (err.code === 'EAUTH') {
+          res.status(403);
+          res.end(http.STATUS_CODES[403]);
         } else {
           res.status(500);
           res.end(err.stack);
-          cleanup();
         }
       });
-    });
-    req.on('error', err => {
-      res.status(500);
-      res.end(err.stack);
-      cleanup();
-    });
-  }, {
-    keep: true,
-    unsafeCleanup: true,
-  });
+  } else {
+    res.status(401);
+    res.end(http.STATUS_CODES[401]);
+  }
 });
 /* app.get('*', (req, res, next) => {
   const module = match[1];

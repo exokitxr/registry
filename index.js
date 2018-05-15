@@ -212,7 +212,7 @@ app.put('/p', (req, res, next) => {
 
                   return Promose.resolve([null, null]);
                 })
-                .then(async (codeEs, codeCjs) => {
+                .then(async ([codeEs, codeCjs]) => {
                   console.log('upload module', {name, version});
 
                   return Promise.all([

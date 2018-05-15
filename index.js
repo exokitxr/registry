@@ -77,87 +77,84 @@ const _uploadFile = (p, basePath, prefix) => new Promise((accept, reject) => {
     }
   });
 });
-app.put('/projects/:module', (req, res, next) => {
-  const {module} = req.params;
-
-  if (/^[a-z0-9\-]+$/i.test(module)) {
-    tmp.dir((err, p, cleanup) => {
-      const us = req.pipe(zlib.createGunzip());
-      us.on('error', err => {
-        res.status(500);
-        res.end(err.stack);
-        cleanup();
-      });
-      const ws = us.pipe(tarFs.extract(p));
-
-      ws.on('finish', () => {
-        const packageJsonPath = path.join(p, 'package.json');
-
-        fs.readFile(packageJsonPath, (err, s) => {
-          if (!err) {
-            const packageJson = JSON.parse(s);
-            const {description = null, version = '0.0.1'} = packageJson;
-
-            const yarnProcess = child_process.spawn(
-              process.argv[0],
-              [
-                yarnPath,
-                'install',
-                '--production',
-                '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
-              ],
-              {
-                cwd: p,
-                env: process.env,
-              }
-            );
-            yarnProcess.stdout.pipe(process.stdout);
-            yarnProcess.stderr.pipe(process.stderr);
-            yarnProcess.on('exit', async code => {
-              if (code === 0) {
-                _uploadDirectory('/', p, `${module}/${version}`)
-                  .then(() => {
-                    res.json({
-                      module,
-                      description,
-                      version,
-                    });
-                  })
-                  .catch(err => {
-                    res.status(500);
-                    res.end(err.stack);
-                    cleanup();
-                  });
-              } else {
-                res.status(500);
-                res.end(new Error('npm publish exited with status code ' + code).stack);
-                cleanup();
-              }
-            });
-          } else if (err.code === 'ENOENT') {
-            res.status(400);
-            res.end(http.STATUS_CODES[400]);
-            cleanup();
-          } else {
-            res.status(500);
-            res.end(err.stack);
-            cleanup();
-          }
-        });
-      });
-      req.on('error', err => {
-        res.status(500);
-        res.end(err.stack);
-        cleanup();
-      });
-    }, {
-      keep: true,
-      unsafeCleanup: true,
+app.put('/projects', (req, res, next) => {
+  tmp.dir((err, p, cleanup) => {
+    const us = req.pipe(zlib.createGunzip());
+    us.on('error', err => {
+      res.status(500);
+      res.end(err.stack);
+      cleanup();
     });
-  } else {
-    res.status(400);
-    res.end(http.STATUS_CODES[400]);
-  }
+    const ws = us.pipe(tarFs.extract(p));
+
+    ws.on('finish', () => {
+      const packageJsonPath = path.join(p, 'package.json');
+
+      fs.readFile(packageJsonPath, (err, s) => {
+        if (!err) {
+          const packageJson = JSON.parse(s);
+          const {name, description = null, version = '0.0.1'} = packageJson;
+
+          console.log('install module', {name, version});
+
+          const yarnProcess = child_process.spawn(
+            process.argv[0],
+            [
+              yarnPath,
+              'install',
+              '--production',
+              '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
+            ],
+            {
+              cwd: p,
+              env: process.env,
+            }
+          );
+          yarnProcess.stdout.pipe(process.stdout);
+          yarnProcess.stderr.pipe(process.stderr);
+          yarnProcess.on('exit', async code => {
+            if (code === 0) {
+              console.log('upload module', {name, version});
+
+              _uploadDirectory('/', p, `${name}/${version}`)
+                .then(() => {
+                  res.json({
+                    module,
+                    description,
+                    version,
+                  });
+                })
+                .catch(err => {
+                  res.status(500);
+                  res.end(err.stack);
+                  cleanup();
+                });
+            } else {
+              res.status(500);
+              res.end(new Error('npm publish exited with status code ' + code).stack);
+              cleanup();
+            }
+          });
+        } else if (err.code === 'ENOENT') {
+          res.status(400);
+          res.end(http.STATUS_CODES[400]);
+          cleanup();
+        } else {
+          res.status(500);
+          res.end(err.stack);
+          cleanup();
+        }
+      });
+    });
+    req.on('error', err => {
+      res.status(500);
+      res.end(err.stack);
+      cleanup();
+    });
+  }, {
+    keep: true,
+    unsafeCleanup: true,
+  });
 });
 /* app.get('*', (req, res, next) => {
   const module = match[1];

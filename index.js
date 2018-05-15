@@ -27,7 +27,7 @@ const s3 = new AWS.S3();
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
-const HOST = 'https://registry.webmr.io';
+const HOST = 'http://127.0.0.1:8000';
 const FILES_HOST = 'https://files.webmr.io';
 
 const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {
@@ -551,15 +551,36 @@ app.get('/*', (req, res, next) => {
       const keys = data.Contents.map(({Key}) => Key);
       const regex = new RegExp('(' + escapeRegExp(p) + '[^/]+?(?:/|$))');
       const files = [];
+      const filesIndex = {};
       for (let i = 0; i < keys.length; i++) {
         const key = keys[i];
         let match;
         if (match = key.match(regex)) {
-          files.push(match[1]);
+          const file = match[1];
+
+          if (!filesIndex[file]) {
+            files.push(file);
+            filesIndex[file] = true;
+          }
         }
       }
       const isDirectory = s => /\/$/.test(s);
-      let html = `<!doctype html><html><body><h1>/${p}</h1>`;
+      const pHtml = (() => {
+        let result = '';
+        const components = p.split('/');
+        let acc = `${HOST}/`;
+        for (let i = 0; i < components.length; i++) {
+          const component = components[i];
+
+          if (component) {
+            acc += component + '/';
+            const uri = encodeURI(acc);
+            result += `<a href="${uri}">${component}</a>/`;
+          }
+        }
+        return result;
+      })();
+      let html = `<!doctype html><html><body><h1>/${pHtml}</h1>`;
       files.sort((a, b) => {
         const diff = +isDirectory(b) - +isDirectory(a);
         if (diff !== 0) {

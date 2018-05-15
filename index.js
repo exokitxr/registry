@@ -226,7 +226,7 @@ app.put('/p', (req, res, next) => {
                         version,
                       });
                       cleanup();
-                    });
+                    })
                     .catch(err => {
                       res.status(500);
                       res.end(err.stack);

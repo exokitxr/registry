@@ -12,6 +12,7 @@ const tarFs = require('tar-fs');
 const httpProxy = require('http-proxy');
 const yarnPath = require.resolve('yarn/bin/yarn.js');
 const semver = require('semver');
+const ignore = require('ignore');
 const {meaningful} = require('meaningful-string');
 const AWS = require('aws-sdk');
 
@@ -56,51 +57,88 @@ app.get('/p/:project*', (req, res, next) => {
     }
   });
 });
-const _uploadDirectory = (p, basePath, prefix) => new Promise((accept, reject) => {
-  const fullPath = path.join(basePath, p);
-
-  fs.readdir(fullPath, async (err, files) => {
+const _readFile = (p, opts) => new Promise((accept, reject) => {
+  fs.readFile(p, opts, (err, data) => {
     if (!err) {
-      if (files.length > 0) {
-        for (const fileName of files) {
-          const p2 = path.join(p, fileName);
-          const fullPath2 = path.join(basePath, p2);
-
-          await new Promise((accept, reject) => {
-            fs.lstat(fullPath2, (err, stats) => {
-              if (stats.isDirectory()) {
-                _uploadDirectory(p2, basePath, prefix)
-                  .then(accept, reject);
-              } else {
-                _uploadFile(p2, basePath, prefix)
-                  .then(accept, reject);
-              }
-            });
-          });
-        }
-
-        accept();
-      } else {
-        accept();
-      }
+      accept(data);
+    } else if (err.code === 'ENOENT') {
+      accept(null);
     } else {
       reject(err);
     }
   });
 });
-const _uploadFile = (p, basePath, prefix) => new Promise((accept, reject) => {
-  const fullPath = path.join(basePath, p);
-  s3.upload({
-    Bucket: BUCKET,
-    Key: path.join(prefix, p),
-    Body: fs.createReadStream(fullPath),
-  }, err => {
-    if (!err) {
-      accept();
-    } else {
-      reject(err);
+const _getIgnore = p => Promise.all([
+  _readFile(path.join(p, '.gitignore'), 'utf8'),
+  _readFile(path.join(p, '.npmignore'), 'utf8'),
+])
+  .then(([
+    gitignore,
+    npmignore,
+  ]) => {
+    const ig = ignore();
+
+    const contents = npmignore || gitignore || null;
+    if (contents) {
+      ig.add(contents.split('\n'));
     }
+
+    return Promise.resolve(ig);
   });
+const _uploadDirectory = (p, basePath, ig, prefix) => new Promise((accept, reject) => {
+  if (!ig.ignores(p)) {
+    const fullPath = path.join(basePath, p);
+
+    fs.readdir(fullPath, async (err, files) => {
+      if (!err) {
+        if (files.length > 0) {
+          for (const fileName of files) {
+            const p2 = path.join(p, fileName);
+            const fullPath2 = path.join(basePath, p2);
+
+            await new Promise((accept, reject) => {
+              fs.lstat(fullPath2, (err, stats) => {
+                if (stats.isDirectory()) {
+                  _uploadDirectory(p2, basePath, ig, prefix)
+                    .then(accept, reject);
+                } else {
+                  _uploadFile(p2, basePath, ig, prefix)
+                    .then(accept, reject);
+                }
+              });
+            });
+          }
+
+          accept();
+        } else {
+          accept();
+        }
+      } else {
+        reject(err);
+      }
+    });
+  } else {
+    accept();
+  }
+});
+const _uploadFile = (p, basePath, ig, prefix) => new Promise((accept, reject) => {
+  if (!ig.ignores(p)) {
+    const fullPath = path.join(basePath, p);
+
+    s3.upload({
+      Bucket: BUCKET,
+      Key: path.join(prefix, p),
+      Body: fs.createReadStream(fullPath),
+    }, err => {
+      if (!err) {
+        accept();
+      } else {
+        reject(err);
+      }
+    });
+  } else {
+    accept();
+  }
 });
 app.put('/p', (req, res, next) => {
   tmp.dir((err, p, cleanup) => {
@@ -141,7 +179,9 @@ app.put('/p', (req, res, next) => {
             if (code === 0) {
               console.log('upload module', {name, version});
 
-              _uploadDirectory('/', p, `${name}/${version}`)
+              const ig = await _getIgnore(p);
+
+              _uploadDirectory('/', p, ig, `${name}/${version}`)
                 .then(() => {
                   res.json({
                     module,

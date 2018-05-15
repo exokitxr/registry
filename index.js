@@ -19,6 +19,9 @@ const BUCKET = 'files.webmr.io';
 const s3 = new AWS.S3();
 
 const app = express();
+app.get('/', (req, res, next) => {
+  res.end('Hello, webmr registry!\n');
+});
 app.get('/p', (req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

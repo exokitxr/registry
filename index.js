@@ -249,9 +249,9 @@ app.put('/p', (req, res, next) => {
                   ])
                     .then(() => {
                       res.json({
-                        module,
-                        description,
+                        name,
                         version,
+                        description,
                       });
                       cleanup();
                     })

@@ -578,9 +578,9 @@ app.get('/f*', (req, res, next) => {
   objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
     res.status(statusCode);
     res.set(headers);
+    res.type(extname);
   });
   const rs = objectStream.createReadStream();
-  res.type(extname);
   rs.pipe(res);
   rs.on('error', err => {
     if (err.code === 'NoSuchKey') {
@@ -658,9 +658,9 @@ app.get('/:project/:version*', (req, res, next) => {
   objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
     res.status(statusCode);
     res.set(headers);
+    res.type(extname);
   });
   const rs = objectStream.createReadStream();
-  res.type(extname);
   rs.pipe(res);
   rs.on('error', err => {
     if (err.code === 'NoSuchKey') {

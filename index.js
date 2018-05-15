@@ -12,9 +12,10 @@ const tarFs = require('tar-fs');
 const httpProxy = require('http-proxy');
 const yarnPath = require.resolve('yarn/bin/yarn.js');
 const semver = require('semver');
+const {meaningful} = require('meaningful-string');
 const AWS = require('aws-sdk');
 
-const port = process.env['PORT'] || 8000;
+const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
 
 const s3 = new AWS.S3();
@@ -214,8 +215,26 @@ app.put('/projects', (req, res, next) => {
     next();
   }
 }); */
+app.put('/files*', (req, res, next) => {
+  const p = req.params[0];
+  const key = path.join('_files', meaningful().toLowerCase(), p);
+
+  s3.upload({
+    Bucket: BUCKET,
+    Key: key,
+    Body: req,
+  }, (err, data) => {
+    if (!err) {
+      res.write(key);
+      res.end('\n';
+    } else {
+      res.status(500);
+      res.end(err.stack);
+    }
+  });
+});
 http.createServer(app)
-  .listen(port);
+  .listen(PORT);
 
 process.on('uncaughtException', err => {
   console.warn(err);

@@ -192,12 +192,19 @@ app.put('/p', (req, res, next) => {
                   rollupPluginJson(),
                 ],
               })
-                .then(bundle => bundle.generate({
-                  name: module,
-                  format: 'cjs',
-                  strict: false,
-                }))
-                .then(async code => {
+                .then(bundle => Promise.all([
+                  bundle.generate({
+                    name: module,
+                    format: 'es',
+                    strict: false,
+                  }),
+                  bundle.generate({
+                    name: module,
+                    format: 'cjs',
+                    strict: false,
+                  }),
+                ]))
+                .then(async (codeEs, codeCjs) => {
                   console.log('upload module', {name, version});
 
                   return Promise.all([
@@ -208,8 +215,21 @@ app.put('/p', (req, res, next) => {
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
+                        Key: pth.join('_builds', `${name}/${version}/${name}.mjs`),
+                        Body: codeEs,
+                      }, err => {
+                        if (!err) {
+                          accept();
+                        } else {
+                          reject(err);
+                        }
+                      });
+                    }),
+                    new Promise((accept, reject) => {
+                      s3.putObject({
+                        Bucket: BUCKET,
                         Key: pth.join('_builds', `${name}/${version}/${name}.js`),
-                        Body: code,
+                        Body: codeCjs,
                       }, err => {
                         if (!err) {
                           accept();

@@ -526,40 +526,6 @@ app.put('/p', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-/* app.get('*', (req, res, next) => {
-  const module = match[1];
-  const username = match[2];
-  const binding = bindings[`${username}/${module}`];
-
-  if (binding) {
-    let {path: p} = req;
-    console.log('got path', p);
-    if (p === '/') {
-      p = '/index.html';
-    }
-    const rs = fs.createReadStream(path.join(binding.installDirectory, p));
-    rs.pipe(res);
-    rs.on('error', err => {
-      if (err.code === 'ENOENT') {
-        const {port} = binding;
-
-        const proxy = httpProxy.createProxyServer();
-        proxy.web(req, res, {
-          target: `http://127.0.0.1:${port}`,
-        });
-        proxy.on('error', err => {
-          res.status(404);
-          res.end(http.STATUS_CODES[404]);
-        });
-      } else {
-        res.status(500);
-        res.end(err.stack);
-      }
-    });
-  } else {
-    next();
-  }
-}); */
 app.get('/f*', (req, res, next) => {
   const p = req.params[0];
   let extname = path.extname(p);

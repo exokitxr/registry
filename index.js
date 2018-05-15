@@ -181,37 +181,43 @@ app.put('/p', (req, res, next) => {
           yarnProcess.stderr.pipe(process.stderr);
           yarnProcess.on('exit', async code => {
             if (code === 0) {
-              await rollup.rollup({
-                input: path.join(p, main),
-                /* acorn: {
-                  allowHashBang: true,
-                }, */
-                plugins: [
-                  rollupPluginNodeResolve({
-                    main: true,
-                    preferBuiltins: false,
-                  }),
-                  rollupPluginCommonJs(),
-                  rollupPluginJson(),
-                ],
-              })
-                .then(bundle => Promise.all([
-                  bundle.generate({
-                    name: module,
-                    format: 'es',
-                    strict: false,
-                  }).then(result => result.code),
-                  bundle.generate({
-                    name: module,
-                    format: 'cjs',
-                    strict: false,
-                  }).then(result => result.code),
-                ]))
-                .catch(err => {
-                  console.warn('build error: ' + err.stack);
-
-                  return Promose.resolve([null, null]);
+              await (main ?
+                rollup.rollup({
+                  input: path.join(p, main),
+                  /* acorn: {
+                    allowHashBang: true,
+                  }, */
+                  plugins: [
+                    rollupPluginNodeResolve({
+                      main: true,
+                      preferBuiltins: false,
+                    }),
+                    rollupPluginCommonJs(),
+                    rollupPluginJson(),
+                  ],
+                  output: {
+                    name,
+                  },
                 })
+                  .then(bundle => Promise.all([
+                    bundle.generate({
+                      name: module,
+                      format: 'es',
+                      strict: false,
+                    }).then(result => result.code),
+                    bundle.generate({
+                      name: module,
+                      format: 'cjs',
+                      strict: false,
+                    }).then(result => result.code),
+                  ]))
+                  .catch(err => {
+                    console.warn('build error', err.stack);
+                    return Promise.resolve([null, null]);
+                  })
+                :
+                  Promise.resolve([null, null])
+              )
                 .then(async ([codeEs, codeCjs]) => {
                   console.log('upload module', {name, version});
 
@@ -252,6 +258,10 @@ app.put('/p', (req, res, next) => {
                         name,
                         version,
                         description,
+                        contains: {
+                          es: Boolean(codeEs),
+                          cjs: Boolean(codeCjs),
+                        },
                       });
                       cleanup();
                     })

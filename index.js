@@ -565,7 +565,7 @@ app.get('/f*', (req, res, next) => {
 
   const params = {
     Bucket: BUCKET,
-    Key: path.join(project, version, p),
+    Key: path.join('_files', p),
   };
   if (req.headers['if-none-match']) {
     params.IfNoneMatch = req.headers['if-none-match'];

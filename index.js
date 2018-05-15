@@ -27,7 +27,7 @@ const s3 = new AWS.S3();
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
-const HOST = 'http://127.0.0.1:8000';
+const HOST = 'http://registry.webmr.io';
 const FILES_HOST = 'https://files.webmr.io';
 
 const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {

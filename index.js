@@ -379,10 +379,23 @@ app.get('/f*', (req, res, next) => {
     extname = 'application/octet-stream';
   }
 
-  const rs = s3.getObject({
+  const params = {
     Bucket: BUCKET,
-    Key: path.join('_files', p),
-  }).createReadStream();
+    Key: path.join(project, version, p),
+  };
+  if (req.headers['if-none-match']) {
+    params.IfNoneMatch = req.headers['if-none-match'];
+  }
+  if (req.headers['range']) {
+    params.IfNoneMatch = req.headers['range'];
+  }
+  const objectStream = s3.getObject(params);
+  let etag;
+  objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
+    res.status(statusCode);
+    res.set(headers);
+  });
+  const rs = objectStream.createReadStream();
   res.type(extname);
   rs.pipe(res);
   rs.on('error', err => {
@@ -424,10 +437,23 @@ app.get('/:project/:version*', (req, res, next) => {
     extname = 'application/octet-stream';
   }
 
-  const rs = s3.getObject({
+  const params = {
     Bucket: BUCKET,
     Key: path.join(project, version, p),
-  }).createReadStream();
+  };
+  if (req.headers['if-none-match']) {
+    params.IfNoneMatch = req.headers['if-none-match'];
+  }
+  if (req.headers['range']) {
+    params.IfNoneMatch = req.headers['range'];
+  }
+  const objectStream = s3.getObject(params);
+  let etag;
+  objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
+    res.status(statusCode);
+    res.set(headers);
+  });
+  const rs = objectStream.createReadStream();
   res.type(extname);
   rs.pipe(res);
   rs.on('error', err => {

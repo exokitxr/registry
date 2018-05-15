@@ -19,10 +19,12 @@
   "homepage": "https://github.com/modulesio/webmr-service#readme",
   "dependencies": {
     "aws-sdk": "^2.239.1",
+    "body-parser": "^1.18.3",
     "express": "^4.16.3",
     "http-proxy": "^1.17.0",
     "ignore": "^3.3.8",
     "meaningful-string": "^1.2.1",
+    "password-hash-and-salt": "^0.1.4",
     "promise-concurrency": "^1.1.0",
     "rollup": "^0.59.0",
     "rollup-plugin-commonjs": "^9.1.3",

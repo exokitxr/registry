@@ -8,6 +8,9 @@ const child_process = require('child_process');
 
 const express = require('express');
 const tmp = require('tmp');
+const bodyParser = require('body-parser');
+const bodyParserJson = bodyParser.json();
+const phash = require('password-hash-and-salt');
 const tarFs = require('tar-fs');
 // const httpProxy = require('http-proxy');
 const promiseConcurrency = require('promise-concurrency');
@@ -29,6 +32,21 @@ const s3 = new AWS.S3();
 const app = express();
 app.get('/', (req, res, next) => {
   res.end('Hello, webmr registry!\n');
+});
+app.post('/l', bodyParserJson, (req, res, next) => {
+  if (req.body && typeof req.body.email === 'string' && typeof req.body.password === 'string') {
+    phash(req.body.password).hash((err, hash) => {
+      if (!err) {
+        console.log('got hash', hash);
+      } else {
+        res.status(500);
+        res.end(err.stack);
+      }
+    });
+  } else {
+    res.status(400);
+    res.end(http.STATUS_CODES[400]);
+  }
 });
 app.get('/p', (req, res, next) => {
   _cors(req, res);

@@ -23,11 +23,10 @@ const rollupPluginJson = require('rollup-plugin-json');
 const ignore = require('ignore');
 const {meaningful} = require('meaningful-string');
 const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
-
-const s3 = new AWS.S3();
 
 const app = express();
 app.get('/', (req, res, next) => {

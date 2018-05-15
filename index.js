@@ -163,38 +163,6 @@ app.post('/l', bodyParserJson, (req, res, next) => {
     res.end(http.STATUS_CODES[400]);
   }
 });
-app.get('/p', (req, res, next) => {
-  _cors(req, res);
-
-  s3.listObjects({
-    Bucket: BUCKET,
-  }, (err, data) => {
-    if (!err) {
-      res.json(data.Contents.map(({Key}) => Key));
-    } else {
-      res.status(500);
-      res.end(err.stack);
-    }
-  });
-});
-app.get('/p/:project*', (req, res, next) => {
-  _cors(req, res);
-
-  const {project} = req.params;
-  const p = req.params[0];
-
-  s3.listObjects({
-    Bucket: BUCKET,
-    Prefix: path.join(project, p),
-  }, (err, data) => {
-    if (!err) {
-      res.json(data.Contents.map(({Key}) => Key));
-    } else {
-      res.status(500);
-      res.end(err.stack);
-    }
-  });
-});
 const _readFile = (p, opts) => new Promise((accept, reject) => {
   fs.readFile(p, opts, (err, data) => {
     if (!err) {
@@ -527,43 +495,6 @@ app.put('/p', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-app.get('/f*', (req, res, next) => {
-  const p = req.params[0];
-  let extname = path.extname(p);
-  if (extname) {
-    extname = extname.slice(1);
-  } else {
-    extname = 'application/octet-stream';
-  }
-
-  const params = {
-    Bucket: BUCKET,
-    Key: path.join('_files', p),
-  };
-  if (req.headers['if-none-match']) {
-    params.IfNoneMatch = req.headers['if-none-match'];
-  }
-  if (req.headers['range']) {
-    params.IfNoneMatch = req.headers['range'];
-  }
-  const objectStream = s3.getObject(params);
-  let etag;
-  objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
-    res.status(statusCode);
-    res.set(headers);
-  });
-  const rs = objectStream.createReadStream();
-  rs.pipe(res);
-  rs.on('error', err => {
-    if (err.code === 'NoSuchKey') {
-      res.status(404);
-      res.end(http.STATUS_CODES[404]);
-    } else {
-      res.status(500);
-      res.end(err.stack);
-    }
-  });
-});
 app.put('/f*', (req, res, next) => {
   const authorization = req.get('authorization') || '';
   const basic = authorization.match(/^Basic\s+(.+)$/i)[1];
@@ -605,50 +536,51 @@ app.put('/f*', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-app.get('/:project/:version*', (req, res, next) => {
-  const {project, version} = req.params;
-  const p = req.params[0] || 'index.html';
-  let extname = path.extname(p);
-  if (extname) {
-    extname = extname.slice(1);
-  } else {
-    extname = 'application/octet-stream';
+app.get('/*', (req, res, next) => {
+  let p = req.params[0];
+  if (!/\/$/.test(p)) {
+    p += '/';
   }
 
-  const params = {
+  s3.listObjects({
     Bucket: BUCKET,
-    Key: path.join(project, version, p),
-  };
-  if (req.headers['if-none-match']) {
-    params.IfNoneMatch = req.headers['if-none-match'];
-  }
-  if (req.headers['range']) {
-    params.IfNoneMatch = req.headers['range'];
-  }
-  const objectStream = s3.getObject(params);
-  let etag;
-  objectStream.on('httpHeaders', (statusCode, headers, response, statusMessage) => {
-    res.status(statusCode);
-    res.set(headers);
-  });
-  const rs = objectStream.createReadStream();
-  rs.pipe(res);
-  rs.on('error', err => {
-    if (err.code === 'NoSuchKey') {
-      res.status(404);
-      res.end(http.STATUS_CODES[404]);
+    Prefix: p,
+  }, (err, data) => {
+    if (!err) {
+      const keys = data.Contents.map(({Key}) => Key);
+      const regex = new RegExp('(' + escapeRegExp(p) + '[^/]+?(?:/|$))');
+      const files = [];
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        let match;
+        if (match = key.match(regex)) {
+          files.push(match[1]);
+        }
+      }
+      const isDirectory = s => /\/$/.test(s);
+      res.json(files.sort((a, b) => {
+        const diff = +isDirectory(b) - +isDirectory(a);
+        if (diff !== 0) {
+          return diff;
+        } else {
+          return a.localeCompare(b);
+        }
+      }));
     } else {
       res.status(500);
       res.end(err.stack);
     }
   });
 });
-const _cors = (req, res) => {
+function escapeRegExp(str) {
+  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
+}
+/* const _cors = (req, res) => {
   res.set('Access-Control-Allow-Origin', '**');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Allow-Credentials', 'true');
-};
+}; */
 http.createServer(app)
   .listen(PORT);
 

@@ -11,7 +11,11 @@ const tmp = require('tmp');
 const tarFs = require('tar-fs');
 const httpProxy = require('http-proxy');
 const yarnPath = require.resolve('yarn/bin/yarn.js');
-const semver = require('semver');
+const rollup = require('rollup');
+const rollupPluginNodeResolve = require('rollup-plugin-node-resolve');
+const rollupPluginCommonJsAsync = require('rollup-plugin-commonjs-async');
+const rollupPluginJson = require('rollup-plugin-json');
+// const semver = require('semver');
 const ignore = require('ignore');
 const {meaningful} = require('meaningful-string');
 const AWS = require('aws-sdk');
@@ -177,22 +181,57 @@ app.put('/p', (req, res, next) => {
           yarnProcess.stderr.pipe(process.stderr);
           yarnProcess.on('exit', async code => {
             if (code === 0) {
-              console.log('upload module', {name, version});
+              await rollup.rollup({
+                input: p,
+                plugins: [
+                  rollupPluginNodeResolve({
+                    main: true,
+                    preferBuiltins: false,
+                  }),
+                  rollupPluginCommonJsAsync(),
+                  rollupPluginJson(),
+                ],
+              })
+                .then(bundle => bundle.generate({
+                  name: module,
+                  format: 'cjs',
+                  strict: false,
+                }))
+                .then(async code => {
+                  console.log('upload module', {name, version});
 
-              const ig = await _getIgnore(p);
-
-              _uploadDirectory('/', p, ig, `${name}/${version}`)
-                .then(() => {
-                  res.json({
-                    module,
-                    description,
-                    version,
-                  });
-                })
-                .catch(err => {
-                  res.status(500);
-                  res.end(err.stack);
-                  cleanup();
+                  return Promise.all([
+                    async () => {
+                      const ig = await _getIgnore(p);
+                      await _uploadDirectory('/', p, ig, `${name}/${version}`);
+                    },
+                    new Promise((accept, reject) => {
+                      s3.putObject({
+                        Bucket: BUCKET,
+                        Key: pth.join('_builds', `${name}/${version}/${name}.js`),
+                        Body: code,
+                      }, err => {
+                        if (!err) {
+                          accept();
+                        } else {
+                          reject(err);
+                        }
+                      });
+                    }),
+                  ])
+                    .then(() => {
+                      res.json({
+                        module,
+                        description,
+                        version,
+                      });
+                      cleanup();
+                    });
+                    .catch(err => {
+                      res.status(500);
+                      res.end(err.stack);
+                      cleanup();
+                    });
                 });
             } else {
               res.status(500);

@@ -162,7 +162,7 @@ app.put('/p/:username/:module', (req, res, next) => {
     res.end(http.STATUS_CODES[400]);
   }
 });
-app.get('*', (req, res, next) => {
+/* app.get('*', (req, res, next) => {
   const module = match[1];
   const username = match[2];
   const binding = bindings[`${username}/${module}`];
@@ -195,7 +195,7 @@ app.get('*', (req, res, next) => {
   } else {
     next();
   }
-});
+}); */
 http.createServer(app)
   .listen(port);
 

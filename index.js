@@ -32,7 +32,7 @@ app.get('/p', (req, res, next) => {
     Bucket: BUCKET,
   }, (err, data) => {
     if (!err) {
-      res.json(data);
+      res.json(data.Contents.map(({Key}) => Key));
     } else {
       res.status(500);
       res.end(err.stack);
@@ -50,7 +50,7 @@ app.get('/p/:project*', (req, res, next) => {
     Prefix: path.join(project, p),
   }, (err, data) => {
     if (!err) {
-      res.json(data);
+      res.json(data.Contents.map(({Key}) => Key));
     } else {
       res.status(500);
       res.end(err.stack);

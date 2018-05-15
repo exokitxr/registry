@@ -225,8 +225,9 @@ app.put('/files*', (req, res, next) => {
     Body: req,
   }, (err, data) => {
     if (!err) {
-      res.write(key);
-      res.end('\n');
+      res.json({
+        path: key,
+      });
     } else {
       res.status(500);
       res.end(err.stack);

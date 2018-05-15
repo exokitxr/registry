@@ -34,9 +34,63 @@ app.get('/', (req, res, next) => {
 });
 app.post('/l', bodyParserJson, (req, res, next) => {
   if (req.body && typeof req.body.email === 'string' && typeof req.body.password === 'string') {
-    phash(req.body.password).hash((err, hash) => {
+    const rs = s3.getObject({
+      Bucket: BUCKET,
+      Key: path.join('_users', req.body.email),
+    }, (err, result) => {
       if (!err) {
-        console.log('got hash', hash);
+        const hash = result.Body.toString('utf8');
+
+        phash(req.body.password).verifyAgainst(hash, (err, verified) => {
+          if (!err) {
+            if (verified) {
+              res.json({});
+            } else {
+              res.status(403);
+              res.end(http.STATUS_CODES[403]);
+            }
+          } else {
+            res.status(500);
+            res.end(err.stack);
+          }
+        });
+      } else if (err.code === 'NoSuchKey') {
+        phash(req.body.password).hash((err, hash) => {
+          if (!err) {
+            console.log('put hash', {password: req.body.password, hash});
+
+            s3.putObject({
+              Bucket: BUCKET,
+              Key: path.join('_users', req.body.email),
+              Body: hash,
+            }, err => {
+              if (!err) {
+                res.json({});
+              } else {
+                res.status(500);
+                res.end(err.stack);
+              }
+            });
+          } else {
+            res.status(500);
+            res.end(err.stack);
+          }
+        });
+      } else {
+        res.status(500);
+        res.end(err.stack);
+      }
+    });
+    rs.on('error', err => {
+      if (err.code === 'NoSuchKey') {
+        phash(req.body.password).hash((err, hash) => {
+          if (!err) {
+            console.log('got hash', hash);
+          } else {
+            res.status(500);
+            res.end(err.stack);
+          }
+        });
       } else {
         res.status(500);
         res.end(err.stack);

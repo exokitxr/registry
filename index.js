@@ -4,6 +4,7 @@ const http = require('http');
 const https = require('https');
 const os = require('os');
 const zlib = require('zlib');
+const crypto = require('crypto');
 const child_process = require('child_process');
 
 const express = require('express');
@@ -32,12 +33,14 @@ const _requestUserFromCredentials = (email, password) => new Promise((accept, re
     Key: path.join('_users', email),
   }, (err, result) => {
     if (!err) {
-      const hash = result.Body.toString('utf8');
+      const j = JSON.parse(result.Body.toString('utf8'));
+      const {id, hash} = j;
 
       phash(password).verifyAgainst(hash, (err, verified) => {
         if (!err) {
           if (verified) {
             accept({
+              id,
               email,
             });
           } else {
@@ -49,6 +52,34 @@ const _requestUserFromCredentials = (email, password) => new Promise((accept, re
           reject(err);
         }
       });
+    } else {
+      reject(err);
+    }
+  });
+});
+const _getProject = project => new Promise((accept, reject) => {
+  s3.getObject({
+    Bucket: BUCKET,
+    Key: path.join('_projects', project),
+  }, (err, result) => {
+    if (!err) {
+      const j = JSON.parse(result.Body.toString('utf8'));
+      accept(j);
+    } else if (err.code === 'NoSuchKey') {
+      accept(null);
+    } else {
+      reject(err);
+    }
+  });
+});
+const _setProject = (project, projectSpec) => new Promise((accept, reject) => {
+  s3.putObject({
+    Bucket: BUCKET,
+    Key: path.join('_projects', project),
+    Body: JSON.stringify(projectSpec),
+  }, err => {
+    if (!err) {
+      accept();
     } else {
       reject(err);
     }
@@ -66,12 +97,16 @@ app.post('/l', bodyParserJson, (req, res, next) => {
       Key: path.join('_users', req.body.email),
     }, (err, result) => {
       if (!err) {
-        const hash = result.Body.toString('utf8');
+        const j = JSON.parse(result.Body.toString('utf8'));
+        const {id, email, hash} = j;
 
         phash(req.body.password).verifyAgainst(hash, (err, verified) => {
           if (!err) {
             if (verified) {
-              res.json({});
+              res.json({
+                id,
+                email,
+              });
             } else {
               res.status(403);
               res.end(http.STATUS_CODES[403]);
@@ -84,35 +119,24 @@ app.post('/l', bodyParserJson, (req, res, next) => {
       } else if (err.code === 'NoSuchKey') {
         phash(req.body.password).hash((err, hash) => {
           if (!err) {
-            console.log('put hash', {password: req.body.password, hash});
+            const {email} = req.body;
+            const id = crypto.randomBytes(16).toString('base64');
 
             s3.putObject({
               Bucket: BUCKET,
-              Key: path.join('_users', req.body.email),
-              Body: hash,
+              Key: path.join('_users', email),
+              Body: JSON.stringify({id, email, hash}),
             }, err => {
               if (!err) {
-                res.json({});
+                res.json({
+                  id,
+                  email,
+                });
               } else {
                 res.status(500);
                 res.end(err.stack);
               }
             });
-          } else {
-            res.status(500);
-            res.end(err.stack);
-          }
-        });
-      } else {
-        res.status(500);
-        res.end(err.stack);
-      }
-    });
-    rs.on('error', err => {
-      if (err.code === 'NoSuchKey') {
-        phash(req.body.password).hash((err, hash) => {
-          if (!err) {
-            console.log('got hash', hash);
           } else {
             res.status(500);
             res.end(err.stack);
@@ -274,7 +298,7 @@ app.put('/p', (req, res, next) => {
     const [email, password] = Buffer.from(basic, 'base64').toString('utf8').split(':');
 
     _requestUserFromCredentials(email, password)
-      .then(() => {
+      .then(user => {
         tmp.dir((err, p, cleanup) => {
           const us = req.pipe(zlib.createGunzip());
           us.on('error', err => {
@@ -290,136 +314,170 @@ app.put('/p', (req, res, next) => {
             fs.readFile(packageJsonPath, (err, s) => {
               if (!err) {
                 const packageJson = JSON.parse(s);
-                const {name, version = '0.0.1', description = null, main, browser} = packageJson;
+                const {name, version, main, browser} = packageJson;
 
-                console.log('install module', {name, version});
+                if (typeof name === 'string' && typeof version === 'string') {
+                  _getProject(name)
+                    .then(projectSpec => {
+                      if (!projectSpec || (projectSpec.owner === user.id && !projectSpec.versions.includes(version))) {
+                        console.log('install module', {name, version});
 
-                const yarnProcess = child_process.spawn(
-                  process.argv[0],
-                  [
-                    yarnPath,
-                    'install',
-                    '--production',
-                    '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
-                  ],
-                  {
-                    cwd: p,
-                    env: process.env,
-                  }
-                );
-                yarnProcess.stdout.pipe(process.stdout);
-                yarnProcess.stderr.pipe(process.stderr);
-                yarnProcess.on('exit', async code => {
-                  if (code === 0) {
-                    const _bundleAndUploadFile = fileSpec => rollup.rollup({
-                      input: path.join(p, fileSpec[1]),
-                      plugins: [
-                        rollupPluginNodeResolve({
-                          main: true,
-                          preferBuiltins: false,
-                        }),
-                        rollupPluginCommonJs(),
-                        rollupPluginJson(),
-                      ],
-                      /* output: {
-                        name,
-                      }, */
-                    })
-                      .then(bundle => Promise.all([
-                        bundle.generate({
-                          name: module,
-                          format: 'es',
-                          strict: false,
-                        }).then(result => result.code),
-                        bundle.generate({
-                          name: module,
-                          format: 'cjs',
-                          strict: false,
-                        }).then(result => result.code),
-                      ]))
-                      .catch(err => {
-                        console.warn('build error', err.stack);
-                        return Promise.resolve([null, null]);
-                      })
-                      .then(([codeEs, codeCjs]) => {
-                        const fileName = fileSpec[0].replace(/\.[^\/]+$/, '');
+                        const yarnProcess = child_process.spawn(
+                          process.argv[0],
+                          [
+                            yarnPath,
+                            'install',
+                            '--production',
+                            '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
+                          ],
+                          {
+                            cwd: p,
+                            env: process.env,
+                          }
+                        );
+                        yarnProcess.stdout.pipe(process.stdout);
+                        yarnProcess.stderr.pipe(process.stderr);
+                        yarnProcess.on('exit', async code => {
+                          if (code === 0) {
+                            const _bundleAndUploadFile = fileSpec => rollup.rollup({
+                              input: path.join(p, fileSpec[1]),
+                              plugins: [
+                                rollupPluginNodeResolve({
+                                  main: true,
+                                  preferBuiltins: false,
+                                }),
+                                rollupPluginCommonJs(),
+                                rollupPluginJson(),
+                              ],
+                              /* output: {
+                                name,
+                              }, */
+                            })
+                              .then(bundle => Promise.all([
+                                bundle.generate({
+                                  name: module,
+                                  format: 'es',
+                                  strict: false,
+                                }).then(result => result.code),
+                                bundle.generate({
+                                  name: module,
+                                  format: 'cjs',
+                                  strict: false,
+                                }).then(result => result.code),
+                              ]))
+                              .catch(err => {
+                                console.warn('build error', err.stack);
+                                return Promise.resolve([null, null]);
+                              })
+                              .then(([codeEs, codeCjs]) => {
+                                const fileName = fileSpec[0].replace(/\.[^\/]+$/, '');
 
-                        return Promise.all([
-                          new Promise((accept, reject) => {
-                            s3.putObject({
-                              Bucket: BUCKET,
-                              Key: path.join(name, version, `${fileName}.mjs`),
-                              Body: codeEs,
-                            }, err => {
-                              if (!err) {
-                                accept();
-                              } else {
-                                reject(err);
-                              }
-                            });
-                          }),
-                          new Promise((accept, reject) => {
-                            s3.putObject({
-                              Bucket: BUCKET,
-                              Key: path.join(name, version, `${fileName}.js`),
-                              Body: codeCjs,
-                            }, err => {
-                              if (!err) {
-                                accept();
-                              } else {
-                                reject(err);
-                              }
-                            });
-                          }),
-                        ])
-                      })
-                      .then(() => {});
+                                return Promise.all([
+                                  new Promise((accept, reject) => {
+                                    s3.putObject({
+                                      Bucket: BUCKET,
+                                      Key: path.join(name, version, `${fileName}.mjs`),
+                                      Body: codeEs,
+                                    }, err => {
+                                      if (!err) {
+                                        accept();
+                                      } else {
+                                        reject(err);
+                                      }
+                                    });
+                                  }),
+                                  new Promise((accept, reject) => {
+                                    s3.putObject({
+                                      Bucket: BUCKET,
+                                      Key: path.join(name, version, `${fileName}.js`),
+                                      Body: codeCjs,
+                                    }, err => {
+                                      if (!err) {
+                                        accept();
+                                      } else {
+                                        reject(err);
+                                      }
+                                    });
+                                  }),
+                                ])
+                              })
+                              .then(() => {});
 
-                    const bundleFiles = (main ? [[main, main]] : [])
-                      .concat(typeof browser === 'object' ?
-                          Object.keys(browser).map(k => {
-                            const v = browser[k];
-                            if (v) {
-                              if (typeof v === 'string') {
-                                return [k, v];
-                              } else {
-                                return [k, k];
-                              }
-                            } else {
-                              return null;
-                            }
-                          }).filter(browserFile => browserFile !== null)
-                        :
-                          []
-                      );
+                            const bundleFiles = (main ? [[main, main]] : [])
+                              .concat(typeof browser === 'object' ?
+                                  Object.keys(browser).map(k => {
+                                    const v = browser[k];
+                                    if (v) {
+                                      if (typeof v === 'string') {
+                                        return [k, v];
+                                      } else {
+                                        return [k, k];
+                                      }
+                                    } else {
+                                      return null;
+                                    }
+                                  }).filter(browserFile => browserFile !== null)
+                                :
+                                  []
+                              );
 
-                    await Promise.all(
-                      [(async () => {
-                        const ig = await _getIgnore(p, main, browser);
-                        await _uploadModule('/', p, ig, `${name}/${version}`);
-                      })()]
-                        .concat(bundleFiles.map(fileSpec => _bundleAndUploadFile(fileSpec)))
-                    )
-                      .then(() => {
-                        res.json({
-                          name,
-                          version,
-                          description,
-                          files: bundleFiles.map(fileSpec => fileSpec[0]),
+                            await Promise.all(
+                              [(async () => {
+                                const ig = await _getIgnore(p, main, browser);
+                                await _uploadModule('/', p, ig, `${name}/${version}`);
+                              })()]
+                                .concat(bundleFiles.map(fileSpec => _bundleAndUploadFile(fileSpec)))
+                            )
+                              .then(() => {
+                                const owner = projectSpec ? projectSpec.owner : user.id;
+                                const versions = projectSpec ? projectSpec.versions : [];
+                                versions.push(version);
+
+                                return _setProject(name, {
+                                  name,
+                                  owner,
+                                  versions,
+                                });
+                              })
+                              .then(() => {
+                                res.json({
+                                  name,
+                                  version,
+                                  files: bundleFiles.map(fileSpec => fileSpec[0]),
+                                });
+                                cleanup();
+                              })
+                              .catch(err => {
+                                res.status(500);
+                                res.end(err.stack);
+                                cleanup();
+                              });
+                          } else {
+                            res.status(500);
+                            res.end(new Error('npm publish exited with status code ' + code).stack);
+                            cleanup();
+                          }
                         });
-                        cleanup();
-                      })
-                      .catch(err => {
+                      } else if (projectSpec && projectSpec.owner !== user.id) {
+                        res.status(403);
+                        res.end(http.STATUS_CODES[403]);
+                      } else if (projectSpec && projectSpec.versions.includes(version)) {
+                        res.status(409);
+                        res.end(http.STATUS_CODES[409]);
+                      } else {
                         res.status(500);
                         res.end(err.stack);
-                        cleanup();
-                      });
-                  } else {
-                    res.status(500);
-                    res.end(new Error('npm publish exited with status code ' + code).stack);
-                    cleanup();
-                  }
-                });
+                      }
+                    })
+                    .catch(err => {
+                      res.status(500);
+                      res.end(err.stack);
+                    });
+                } else {
+                  res.status(500);
+                  res.end(err.stack);
+                  cleanup();
+                }
               } else if (err.code === 'ENOENT') {
                 res.status(400);
                 res.end(http.STATUS_CODES[400]);

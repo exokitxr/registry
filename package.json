@@ -21,7 +21,6 @@
     "aws-sdk": "^2.239.1",
     "body-parser": "^1.18.3",
     "express": "^4.16.3",
-    "http-proxy": "^1.17.0",
     "ignore": "^3.3.8",
     "meaningful-string": "^1.2.1",
     "password-hash-and-salt": "^0.1.4",
@@ -31,7 +30,6 @@
     "rollup-plugin-commonjs-async": "0.0.3",
     "rollup-plugin-json": "^3.0.0",
     "rollup-plugin-node-resolve": "^3.3.0",
-    "semver": "^5.5.0",
     "tar-fs": "^1.16.2",
     "tmp": "0.0.33",
     "yarn": "^1.6.0"

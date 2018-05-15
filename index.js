@@ -28,13 +28,42 @@ const s3 = new AWS.S3();
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
 
+const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {
+  s3.getObject({
+    Bucket: BUCKET,
+    Key: path.join('_users', email),
+  }, (err, result) => {
+    if (!err) {
+      const hash = result.Body.toString('utf8');
+
+      phash(password).verifyAgainst(hash, (err, verified) => {
+        if (!err) {
+          if (verified) {
+            accept({
+              email,
+            });
+          } else {
+            const err = new Error('invalid password');
+            err.code = 'EAUTH';
+            reject(err);
+          }
+        } else {
+          reject(err);
+        }
+      });
+    } else {
+      reject(err);
+    }
+  });
+});
+
 const app = express();
 app.get('/', (req, res, next) => {
   res.end('Hello, webmr registry!\n');
 });
 app.post('/l', bodyParserJson, (req, res, next) => {
   if (req.body && typeof req.body.email === 'string' && typeof req.body.password === 'string') {
-    const rs = s3.getObject({
+    s3.getObject({
       Bucket: BUCKET,
       Key: path.join('_users', req.body.email),
     }, (err, result) => {
@@ -480,23 +509,44 @@ app.get('/f*', (req, res, next) => {
   });
 });
 app.put('/f*', (req, res, next) => {
-  const p = req.params[0];
-  const key = path.join('_files', meaningful().toLowerCase(), p);
+  const authorization = req.get('authorization') || '';
+  const basic = authorization.match(/^Basic\s+(.+)$/i)[1];
+  if (basic) {
+    const [email, password] = Buffer.from(basic, 'base64').toString('utf8').split(':');
 
-  s3.upload({
-    Bucket: BUCKET,
-    Key: key,
-    Body: req,
-  }, (err, data) => {
-    if (!err) {
-      res.json({
-        path: key,
+    _requestUserFromCredentials(email, password)
+      .then(() => {
+        const p = req.params[0];
+        const key = path.join('_files', meaningful().toLowerCase(), p);
+
+        s3.upload({
+          Bucket: BUCKET,
+          Key: key,
+          Body: req,
+        }, (err, data) => {
+          if (!err) {
+            res.json({
+              path: key,
+            });
+          } else {
+            res.status(500);
+            res.end(err.stack);
+          }
+        });
+      })
+      .catch(err => {
+        if (err.code === 'EAUTH') {
+          res.status(403);
+          res.end(http.STATUS_CODES[403]);
+        } else {
+          res.status(500);
+          res.end(err.stack);
+        }
       });
-    } else {
-      res.status(500);
-      res.end(err.stack);
-    }
-  });
+  } else {
+    res.status(401);
+    res.end(http.STATUS_CODES[401]);
+  }
 });
 app.get('/:project/:version*', (req, res, next) => {
   const {project, version} = req.params;

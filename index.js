@@ -118,7 +118,6 @@ app.put('/projects/:module', (req, res, next) => {
                 _uploadDirectory('/', p, `${module}/${version}`)
                   .then(() => {
                     res.json({
-                      username,
                       module,
                       description,
                       version,

@@ -91,9 +91,6 @@ const _setProject = (project, projectSpec) => new Promise((accept, reject) => {
 });
 
 const app = express();
-app.get('/', (req, res, next) => {
-  res.end('Hello, webmr registry!\n');
-});
 app.post('/l', bodyParserJson, (req, res, next) => {
   if (req.body && typeof req.body.email === 'string' && typeof req.body.password === 'string') {
     s3.getObject({

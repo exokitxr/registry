@@ -24,7 +24,7 @@ const app = express();
 app.get('/', (req, res, next) => {
   res.end('Hello, webmr registry!\n');
 });
-app.get('/projects', (req, res, next) => {
+app.get('/p', (req, res, next) => {
   _cors(req, res);
 
   s3.listObjects({
@@ -38,7 +38,7 @@ app.get('/projects', (req, res, next) => {
     }
   });
 });
-app.get('/projects/:project*', (req, res, next) => {
+app.get('/p/:project*', (req, res, next) => {
   _cors(req, res);
 
   const {project} = req.params;
@@ -102,7 +102,7 @@ const _uploadFile = (p, basePath, prefix) => new Promise((accept, reject) => {
     }
   });
 });
-app.put('/projects', (req, res, next) => {
+app.put('/p', (req, res, next) => {
   tmp.dir((err, p, cleanup) => {
     const us = req.pipe(zlib.createGunzip());
     us.on('error', err => {
@@ -215,7 +215,7 @@ app.put('/projects', (req, res, next) => {
     next();
   }
 }); */
-app.put('/files*', (req, res, next) => {
+app.put('/f*', (req, res, next) => {
   const p = req.params[0];
   const key = path.join('_files', meaningful().toLowerCase(), p);
 

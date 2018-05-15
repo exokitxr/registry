@@ -218,14 +218,14 @@ app.put('/p', (req, res, next) => {
                 :
                   Promise.resolve([null, null])
               )
-                .then(async ([codeEs, codeCjs]) => {
+                .then(([codeEs, codeCjs]) => {
                   console.log('upload module', {name, version});
 
                   return Promise.all([
-                    async () => {
+                    (async () => {
                       const ig = await _getIgnore(p);
                       await _uploadDirectory('/', p, ig, `${name}/${version}`);
-                    },
+                    })(),
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
@@ -253,23 +253,23 @@ app.put('/p', (req, res, next) => {
                       });
                     }),
                   ])
-                    .then(() => {
-                      res.json({
-                        name,
-                        version,
-                        description,
-                        contains: {
-                          es: Boolean(codeEs),
-                          cjs: Boolean(codeCjs),
-                        },
-                      });
-                      cleanup();
-                    })
-                    .catch(err => {
-                      res.status(500);
-                      res.end(err.stack);
-                      cleanup();
+                  .then(() => {
+                    res.json({
+                      name,
+                      version,
+                      description,
+                      contains: {
+                        es: Boolean(codeEs),
+                        cjs: Boolean(codeCjs),
+                      },
                     });
+                    cleanup();
+                  });
+                })
+                .catch(err => {
+                  res.status(500);
+                  res.end(err.stack);
+                  cleanup();
                 });
             } else {
               res.status(500);

@@ -538,6 +538,8 @@ app.get('/*', (req, res, next) => {
   let p = req.params[0];
   if (!/\/$/.test(p)) {
     p += '/';
+  } else if (p === '/') {
+    p = '';
   }
 
   s3.listObjects({

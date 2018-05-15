@@ -14,14 +14,8 @@ const yarnPath = require.resolve('yarn/bin/yarn.js');
 const AWS = require('aws-sdk');
 
 const port = process.env['PORT'] || 8000;
-const BUCKET = 'registry.webmr.io';
+const BUCKET = 'files.webmr.io';
 
-/* const {AWS_KEY, AWS_ACCESS} = process.env;
-AWS.config.credentials = new AWS.Credentials({
-  accessKeyId: AWS_KEY,
-  secretAccessKey: AWS_ACCESS,
-  region: 'us-west-2',
-}); */
 const s3 = new AWS.S3();
 
 const app = express();

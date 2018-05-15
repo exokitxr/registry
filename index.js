@@ -22,7 +22,7 @@ const app = express();
 app.get('/', (req, res, next) => {
   res.end('Hello, webmr registry!\n');
 });
-app.get('/p', (req, res, next) => {
+app.get('/projects', (req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -76,7 +76,7 @@ const _uploadFile = (p, basePath, prefix) => new Promise((accept, reject) => {
     }
   });
 });
-app.put('/p/:username/:module', (req, res, next) => {
+app.put('/projects/:username/:module', (req, res, next) => {
   const {username, module} = req.params;
 
   if (/^[a-z0-9]+$/i.test(username) && /^[a-z0-9\-]+$/i.test(module)) {

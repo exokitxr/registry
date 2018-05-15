@@ -27,6 +27,7 @@ const s3 = new AWS.S3();
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
+const FILES_HOST = 'files.webmr.io';
 
 const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {
   s3.getObject({
@@ -572,8 +573,7 @@ app.put('/f*', (req, res, next) => {
     _requestUserFromCredentials(email, password)
       .then(() => {
         const p = req.params[0];
-        const keypath = path.join(email, meaningful().toLowerCase(), p);
-        const key = path.join('_files', keypath);
+        const key = path.join('_files', email, meaningful().toLowerCase(), p);
 
         s3.upload({
           Bucket: BUCKET,
@@ -583,7 +583,7 @@ app.put('/f*', (req, res, next) => {
         }, (err, data) => {
           if (!err) {
             res.json({
-              path: path.join('/', 'f', keypath),
+              url: 'https://' + FILES_HOST + '/' + key,
             });
           } else {
             res.status(500);

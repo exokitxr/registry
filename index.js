@@ -404,8 +404,8 @@ app.get('/:project/:version*', (req, res, next) => {
   res.type(extname);
   rs.pipe(res);
   rs.on('error', err => {
-    if (err.code === 'ENOENT') {
-      res.stats(404);
+    if (err.code === 'NoSuchKey') {
+      res.status(404);
       res.end(http.STATUS_CODES[404]);
     } else {
       res.status(500);

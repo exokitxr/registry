@@ -200,13 +200,18 @@ app.put('/p', (req, res, next) => {
                     name: module,
                     format: 'es',
                     strict: false,
-                  }),
+                  }).then(result => result.code),
                   bundle.generate({
                     name: module,
                     format: 'cjs',
                     strict: false,
-                  }),
+                  }).then(result => result.code),
                 ]))
+                .catch(err => {
+                  console.warn('build error: ' + err.stack);
+
+                  return Promose.resolve([null, null]);
+                })
                 .then(async (codeEs, codeCjs) => {
                   console.log('upload module', {name, version});
 

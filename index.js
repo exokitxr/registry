@@ -226,7 +226,7 @@ app.put('/files*', (req, res, next) => {
   }, (err, data) => {
     if (!err) {
       res.write(key);
-      res.end('\n';
+      res.end('\n');
     } else {
       res.status(500);
       res.end(err.stack);

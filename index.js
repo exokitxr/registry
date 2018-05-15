@@ -160,7 +160,7 @@ app.put('/p', (req, res, next) => {
       fs.readFile(packageJsonPath, (err, s) => {
         if (!err) {
           const packageJson = JSON.parse(s);
-          const {name, version = '0.0.1', description = null, main = 'index.js'} = packageJson;
+          const {name, version = '0.0.1', description = null, main, browser} = packageJson;
 
           console.log('install module', {name, version});
 
@@ -181,44 +181,38 @@ app.put('/p', (req, res, next) => {
           yarnProcess.stderr.pipe(process.stderr);
           yarnProcess.on('exit', async code => {
             if (code === 0) {
-              await (main ?
-                rollup.rollup({
-                  input: path.join(p, main),
-                  plugins: [
-                    rollupPluginNodeResolve({
-                      main: true,
-                      preferBuiltins: false,
-                    }),
-                    rollupPluginCommonJs(),
-                    rollupPluginJson(),
-                  ],
-                  output: {
-                    name,
-                  },
+              const _bundleAndUploadFile = fileSpec => rollup.rollup({
+                input: path.join(p, fileSpec[1]),
+                plugins: [
+                  rollupPluginNodeResolve({
+                    main: true,
+                    preferBuiltins: false,
+                  }),
+                  rollupPluginCommonJs(),
+                  rollupPluginJson(),
+                ],
+                /* output: {
+                  name,
+                }, */
+              })
+                .then(bundle => Promise.all([
+                  bundle.generate({
+                    name: module,
+                    format: 'es',
+                    strict: false,
+                  }).then(result => result.code),
+                  bundle.generate({
+                    name: module,
+                    format: 'cjs',
+                    strict: false,
+                  }).then(result => result.code),
+                ]))
+                .catch(err => {
+                  console.warn('build error', err.stack);
+                  return Promise.resolve([null, null]);
                 })
-                  .then(bundle => Promise.all([
-                    bundle.generate({
-                      name: module,
-                      format: 'es',
-                      strict: false,
-                    }).then(result => result.code),
-                    bundle.generate({
-                      name: module,
-                      format: 'cjs',
-                      strict: false,
-                    }).then(result => result.code),
-                  ]))
-                  .catch(err => {
-                    console.warn('build error', err.stack);
-                    return Promise.resolve([null, null]);
-                  })
-                :
-                  Promise.resolve([null, null])
-              )
                 .then(([codeEs, codeCjs]) => {
-                  console.log('upload module', {name, version});
-
-                  const mainName = main.replace(/\.[^\/]+$/, '');
+                  const fileName = fileSpec[0].replace(/\.[^\/]+$/, '');
 
                   return Promise.all([
                     (async () => {
@@ -228,7 +222,7 @@ app.put('/p', (req, res, next) => {
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
-                        Key: path.join(name, version, `${mainName}.mjs`),
+                        Key: path.join(name, version, `${fileName}.mjs`),
                         Body: codeEs,
                       }, err => {
                         if (!err) {
@@ -241,7 +235,7 @@ app.put('/p', (req, res, next) => {
                     new Promise((accept, reject) => {
                       s3.putObject({
                         Bucket: BUCKET,
-                        Key: path.join(name, version, `${mainName}.js`),
+                        Key: path.join(name, version, `${fileName}.js`),
                         Body: codeCjs,
                       }, err => {
                         if (!err) {
@@ -252,18 +246,36 @@ app.put('/p', (req, res, next) => {
                       });
                     }),
                   ])
-                  .then(() => {
-                    res.json({
-                      name,
-                      version,
-                      description,
-                      contains: {
-                        es: Boolean(codeEs),
-                        cjs: Boolean(codeCjs),
-                      },
-                    });
-                    cleanup();
+                })
+                .then(() => {});
+
+              const bundleFiles = (main ? [[main, main]] : [])
+                .concat(typeof browser === 'object' ?
+                    Object.keys(browser).map(k => {
+                      const v = browser[k];
+                      if (v) {
+                        if (typeof v === 'string') {
+                          return [k, v];
+                        } else {
+                          return [k, k];
+                        }
+                      } else {
+                        return null;
+                      }
+                    }).filter(browserFile => browserFile !== null)
+                  :
+                    []
+                );
+
+              await Promise.all(bundleFiles.map(fileSpec => _bundleAndUploadFile(fileSpec)))
+                .then(() => {
+                  res.json({
+                    name,
+                    version,
+                    description,
+                    files: bundleFiles.map(fileSpec => fileSpec[0]),
                   });
+                  cleanup();
                 })
                 .catch(err => {
                   res.status(500);

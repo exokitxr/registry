@@ -328,7 +328,7 @@ app.put('/p', (req, res, next) => {
                             yarnPath,
                             'install',
                             '--production',
-                            '--mutex', 'file:' + path.join(os.tmpdir(), '.intrakit-yarn-lock'),
+                            '--mutex', 'file:' + path.join(os.tmpdir(), '.webmr-registry-yarn-lock'),
                           ],
                           {
                             cwd: p,

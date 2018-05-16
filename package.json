@@ -31,6 +31,7 @@
     "rollup-plugin-commonjs-async": "0.0.3",
     "rollup-plugin-json": "^3.0.0",
     "rollup-plugin-node-resolve": "^3.3.0",
+    "semver": "^5.5.0",
     "tar-fs": "^1.16.2",
     "tmp": "0.0.33",
     "yarn": "^1.6.0"

@@ -12,6 +12,7 @@ const tmp = require('tmp');
 const bodyParser = require('body-parser');
 const bodyParserJson = bodyParser.json();
 const mime = require('mime');
+const semver = require('semver');
 const phash = require('password-hash-and-salt');
 const tarFs = require('tar-fs');
 const promiseConcurrency = require('promise-concurrency');
@@ -405,9 +406,10 @@ app.put('/p', (req, res, next) => {
             fs.readFile(packageJsonPath, (err, s) => {
               if (!err) {
                 const packageJson = JSON.parse(s);
-                const {name, version, main, browser} = packageJson;
+                let {name, version, main, browser} = packageJson;
+                name = name.replace(/\//g, ':');
 
-                if (typeof name === 'string' && typeof version === 'string') {
+                if (typeof name === 'string' && semver.valid(version)) {
                   _getProject(name)
                     .then(projectSpec => {
                       if (!projectSpec || (projectSpec.owner === user.id && !projectSpec.versions.includes(version))) {

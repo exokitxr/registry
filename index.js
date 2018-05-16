@@ -206,7 +206,7 @@ app.post('/l', bodyParserJson, (req, res, next) => {
                       res.json({
                         id,
                         email,
-                        tokenEnc,
+                        token,
                       });
                     } else {
                       res.status(500);

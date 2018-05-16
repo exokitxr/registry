@@ -104,7 +104,7 @@ const _requestUserFromCredentials = (email, password) => new Promise((accept, re
     }
   });
 });
-const _requestUserFromToken = t => new Promise((accept, reject) => {
+const _requestUserFromEmailToken = (email, t) => new Promise((accept, reject) => {
   s3.getObject({
     Bucket: BUCKET,
     Key: path.join('_users', email),
@@ -122,7 +122,7 @@ const _requestUserFromToken = t => new Promise((accept, reject) => {
           token,
         ]) => {
           hash = hash.toString('utf8');
-          token = token.to('base64');
+          token = token.toString('base64');
 
           if (t === token) {
             accept({
@@ -182,11 +182,18 @@ app.post('/l', bodyParserJson, (req, res, next) => {
     }, (err, result) => {
       if (!err) {
         const j = JSON.parse(result.Body.toString('utf8'));
-        const {id, email, hashEnc, hashIv} = j;
+        const {id, email, hashEnc, hashIv, tokenEnc, tokenIv} = j;
 
-        _decrypt(Buffer.from(hashEnc, 'base64'), Buffer.from(hashIv, 'base64'))
-          .then(hash => {
+        Promise.all([
+          _decrypt(Buffer.from(hashEnc, 'base64'), Buffer.from(hashIv, 'base64')),
+          _decrypt(Buffer.from(tokenEnc, 'base64'), Buffer.from(tokenIv, 'base64')),
+        ])
+          .then(([
+            hash,
+            token,
+          ]) => {
             hash = hash.toString('utf8');
+            token = token.toString('base64');
 
             phash(req.body.password).verifyAgainst(hash, (err, verified) => {
               if (!err) {
@@ -194,6 +201,7 @@ app.post('/l', bodyParserJson, (req, res, next) => {
                   res.json({
                     id,
                     email,
+                    token,
                   });
                 } else {
                   res.status(403);
@@ -375,11 +383,12 @@ const _uploadModule = (p, basePath, ig, prefix) => {
 };
 app.put('/p', (req, res, next) => {
   const authorization = req.get('authorization') || '';
-  const basic = authorization.match(/^Basic\s+(.+)$/i)[1];
-  if (basic) {
-    const [email, password] = Buffer.from(basic, 'base64').toString('utf8').split(':');
+  const match = authorization.match(/^Token\s+(.+)\s+(.+)$/i);
+  if (match) {
+    const email = match[1];
+    const token = match[2];
 
-    _requestUserFromCredentials(email, password)
+    _requestUserFromEmailToken(email, token)
       .then(user => {
         tmp.dir((err, p, cleanup) => {
           const us = req.pipe(zlib.createGunzip());
@@ -595,11 +604,12 @@ app.put('/p', (req, res, next) => {
 });
 app.put('/f*', (req, res, next) => {
   const authorization = req.get('authorization') || '';
-  const basic = authorization.match(/^Basic\s+(.+)$/i)[1];
-  if (basic) {
-    const [email, password] = Buffer.from(basic, 'base64').toString('utf8').split(':');
+  const match = authorization.match(/^Token\s+(.+)\s+(.+)$/i);
+  if (match) {
+    const email = match[1];
+    const token = match[2];
 
-    _requestUserFromCredentials(email, password)
+    _requestUserFromEmailToken(email, token)
       .then(() => {
         const p = req.params[0];
         const key = path.join('_files', email, meaningful().toLowerCase(), p);

@@ -608,6 +608,45 @@ app.put('/f/:filename', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
+app.put('/d/:dirname', (req, res, next) => {
+  const {dirname} = req.params;
+
+  const authorization = req.get('authorization') || '';
+  const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
+  if (match) {
+    const email = match[1];
+    const token = match[2];
+
+    _requestUserFromEmailToken(email, token)
+      .then(user => {
+        tmp.dir((err, p, cleanup) => {
+          const us = req.pipe(zlib.createGunzip());
+          us.on('error', err => {
+            res.status(500);
+            res.end(err.stack);
+            cleanup();
+          });
+          const ws = us.pipe(tarFs.extract(p, {
+            dmode: 0555,
+            fmode: 0444,
+          }));
+
+          ws.on('finish', async () => {
+            const ig = ignore();
+            const key = path.join('_files', email, meaningful().toLowerCase(), dirname);
+            await _uploadModule('/', p, ig, key);
+
+            res.json({
+              url: HOST + '/' + key,
+            });
+          });
+        });
+      });
+  } else {
+    res.status(401);
+    res.end(http.STATUS_CODES[401]);
+  }
+});
 app.get('/*', (req, res, next) => {
   let p = req.params[0];
   if (!/\/$/.test(p)) {

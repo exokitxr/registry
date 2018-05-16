@@ -398,7 +398,10 @@ app.put('/p', (req, res, next) => {
             res.end(err.stack);
             cleanup();
           });
-          const ws = us.pipe(tarFs.extract(p));
+          const ws = us.pipe(tarFs.extract(p, {
+            dmode: 0555,
+            fmode: 0444,
+          }));
 
           ws.on('finish', () => {
             const packageJsonPath = path.join(p, 'package.json');

@@ -36,6 +36,30 @@ const HOST = 'http://127.0.0.1:8000';
 const FILES_HOST = 'https://files.webmr.io';
 const CIPHER = 'AES-256-CTR';
 
+const _encrypt = (d, iv) => new Promise((accept, reject) => {
+  const cipher = crypto.createCipheriv(CIPHER, secret, iv);
+  cipher.end(d);
+  const bs = [];
+  cipher.on('data', d => {
+    bs.push(d);
+  });
+  cipher.on('end', () => {
+    const b = Buffer.concat(bs);
+    accept(b);
+  });
+});
+const _decrypt = (d, iv) => new Promise((accept, reject) => {
+  const cipher = crypto.createDecipheriv(CIPHER, secret, iv);
+  cipher.end(d);
+  const bs = [];
+  cipher.on('data', d => {
+    bs.push(d);
+  });
+  cipher.on('end', () => {
+    const b = Buffer.concat(bs);
+    accept(b);
+  });
+});
 const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {
   s3.getObject({
     Bucket: BUCKET,
@@ -43,35 +67,77 @@ const _requestUserFromCredentials = (email, password) => new Promise((accept, re
   }, (err, result) => {
     if (!err) {
       const j = JSON.parse(result.Body.toString('utf8'));
-      const {id, hashEnc, iv} = j;
+      const {id, hashEnc, hashIv, tokenEnc, tokenIv} = j;
 
-      const cipher = crypto.createDecipheriv(CIPHER, secret, Buffer.from(iv, 'base64'));
-      cipher.end(hashEnc, 'base64');
-      const bs = [];
-      cipher.on('data', d => {
-        bs.push(d);
-      });
-      cipher.on('end', () => {
-        const b = Buffer.concat(bs);
-        const hash = b.toString('utf8');
+      Promise.all([
+        _decrypt(Buffer.from(hashEnc, 'base64'), Buffer.from(hashIv, 'base64')),
+        _decrypt(Buffer.from(tokenEnc, 'base64'), Buffer.from(tokenIv, 'base64')),
+      ])
+        .then(([
+          hash,
+          token,
+        ]) => {
+          hash = hash.toString('utf8');
+          token = token.toString('base64');
 
-        phash(password).verifyAgainst(hash, (err, verified) => {
-          if (!err) {
-            if (verified) {
-              accept({
-                id,
-                email,
-              });
+          phash(password).verifyAgainst(hash, (err, verified) => {
+            if (!err) {
+              if (verified) {
+                accept({
+                  id,
+                  email,
+                  hash,
+                  token,
+                });
+              } else {
+                const err = new Error('invalid password');
+                err.code = 'EAUTH';
+                reject(err);
+              }
             } else {
-              const err = new Error('invalid password');
-              err.code = 'EAUTH';
               reject(err);
             }
+          });
+        });
+    } else {
+      reject(err);
+    }
+  });
+});
+const _requestUserFromToken = t => new Promise((accept, reject) => {
+  s3.getObject({
+    Bucket: BUCKET,
+    Key: path.join('_users', email),
+  }, (err, result) => {
+    if (!err) {
+      const j = JSON.parse(result.Body.toString('utf8'));
+      const {id, hashEnc, hashIv, tokenEnc, tokenIv} = j;
+
+      Promise.all([
+        _decrypt(Buffer.from(hashEnc, 'base64'), Buffer.from(hashIv, 'base64')),
+        _decrypt(Buffer.from(tokenEnc, 'base64'), Buffer.from(tokenIv, 'base64')),
+      ])
+        .then(([
+          hash,
+          token,
+        ]) => {
+          hash = hash.toString('utf8');
+          token = token.to('base64');
+
+          if (t === token) {
+            accept({
+              id,
+              email,
+              hash,
+              token,
+            });
           } else {
+            const err = new Error('invalid password');
+            err.code = 'EAUTH';
             reject(err);
+            reject();
           }
         });
-      });
     } else {
       reject(err);
     }
@@ -116,35 +182,29 @@ app.post('/l', bodyParserJson, (req, res, next) => {
     }, (err, result) => {
       if (!err) {
         const j = JSON.parse(result.Body.toString('utf8'));
-        const {id, email, hashEnc, iv} = j;
+        const {id, email, hashEnc, hashIv} = j;
 
-        const cipher = crypto.createDecipheriv(CIPHER, secret, Buffer.from(iv, 'base64'));
-        cipher.end(hashEnc, 'base64');
-        const bs = [];
-        cipher.on('data', d => {
-          bs.push(d);
-        });
-        cipher.on('end', () => {
-          const b = Buffer.concat(bs);
-          const hash = b.toString('utf8');
+        _decrypt(Buffer.from(hashEnc, 'base64'), Buffer.from(hashIv, 'base64'))
+          .then(hash => {
+            hash = hash.toString('utf8');
 
-          phash(req.body.password).verifyAgainst(hash, (err, verified) => {
-            if (!err) {
-              if (verified) {
-                res.json({
-                  id,
-                  email,
-                });
+            phash(req.body.password).verifyAgainst(hash, (err, verified) => {
+              if (!err) {
+                if (verified) {
+                  res.json({
+                    id,
+                    email,
+                  });
+                } else {
+                  res.status(403);
+                  res.end(http.STATUS_CODES[403]);
+                }
               } else {
-                res.status(403);
-                res.end(http.STATUS_CODES[403]);
+                res.status(500);
+                res.end(err.stack);
               }
-            } else {
-              res.status(500);
-              res.end(err.stack);
-            }
+            });
           });
-        });
       } else if (err.code === 'NoSuchKey') {
         const {email, password} = req.body;
 
@@ -153,35 +213,39 @@ app.post('/l', bodyParserJson, (req, res, next) => {
             if (!err) {
               const {email} = req.body;
               const id = crypto.randomBytes(16).toString('base64');
-              const iv = crypto.randomBytes(128/8).toString('base64');
+              const hashIv = crypto.randomBytes(128/8).toString('base64');
+              const token = crypto.randomBytes(32).toString('base64');
+              const tokenIv = crypto.randomBytes(128/8).toString('base64');
 
-              const cipher = crypto.createCipheriv(CIPHER, secret, Buffer.from(iv, 'base64'));
-              cipher.end(hash);
-              const bs = [];
-              cipher.on('data', d => {
-                bs.push(d);
-              });
-              cipher.on('end', () => {
-                const b = Buffer.concat(bs);
-                const hashEnc = b.toString('base64');
+              Promise.all([
+                _encrypt(Buffer.from(hash, 'utf8'), Buffer.from(hashIv, 'base64')),
+                _encrypt(Buffer.from(token, 'base64'), Buffer.from(tokenIv, 'base64')),
+              ])
+                .then(([
+                  hashEnc,
+                  tokenEnc,
+                ]) => {
+                  hashEnc = hashEnc.toString('base64');
+                  tokenEnc = tokenEnc.toString('base64');
 
-                s3.putObject({
-                  Bucket: BUCKET,
-                  Key: path.join('_users', email),
-                  ContentType: 'application/json',
-                  Body: JSON.stringify({id, email, hashEnc, iv}),
-                }, err => {
-                  if (!err) {
-                    res.json({
-                      id,
-                      email,
-                    });
-                  } else {
-                    res.status(500);
-                    res.end(err.stack);
-                  }
+                  s3.putObject({
+                    Bucket: BUCKET,
+                    Key: path.join('_users', email),
+                    ContentType: 'application/json',
+                    Body: JSON.stringify({id, email, hashEnc, hashIv, tokenEnc, tokenIv}),
+                  }, err => {
+                    if (!err) {
+                      res.json({
+                        id,
+                        email,
+                        tokenEnc,
+                      });
+                    } else {
+                      res.status(500);
+                      res.end(err.stack);
+                    }
+                  });
                 });
-              });
             } else {
               res.status(500);
               res.end(err.stack);

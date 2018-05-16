@@ -1,2 +1,2 @@
-web: sh node index.js
-worker: sh node node_modules/webmr-server/index.js
+web: node index.js
+worker: node node_modules/webmr-server/index.js

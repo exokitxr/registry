@@ -343,7 +343,7 @@ const _uploadModule = (p, basePath, ig, prefix) => {
 };
 app.put('/p', (req, res, next) => {
   const authorization = req.get('authorization') || '';
-  const match = authorization.match(/^Token\s+(.+)\s+(.+)$/i);
+  const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
   if (match) {
     const email = match[1];
     const token = match[2];
@@ -568,7 +568,7 @@ app.put('/p', (req, res, next) => {
 });
 app.put('/f*', (req, res, next) => {
   const authorization = req.get('authorization') || '';
-  const match = authorization.match(/^Token\s+(.+)\s+(.+)$/i);
+  const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
   if (match) {
     const email = match[1];
     const token = match[2];

@@ -136,9 +136,12 @@ const _requestUserFromEmailToken = (email, t) => new Promise((accept, reject) =>
             const err = new Error('invalid password');
             err.code = 'EAUTH';
             reject(err);
-            reject();
           }
         });
+    } else if (err.code === 'NoSuchKey') {
+      const err = new Error('no such user');
+      err.code = 'EAUTH';
+      reject(err);
     } else {
       reject(err);
     }

@@ -61,50 +61,6 @@ const _decrypt = (d, iv) => new Promise((accept, reject) => {
     accept(b);
   });
 });
-const _requestUserFromCredentials = (email, password) => new Promise((accept, reject) => {
-  s3.getObject({
-    Bucket: BUCKET,
-    Key: path.join('_users', email),
-  }, (err, result) => {
-    if (!err) {
-      const j = JSON.parse(result.Body.toString('utf8'));
-      const {id, hashEnc, hashIv, tokenEnc, tokenIv} = j;
-
-      Promise.all([
-        _decrypt(Buffer.from(hashEnc, 'base64'), Buffer.from(hashIv, 'base64')),
-        _decrypt(Buffer.from(tokenEnc, 'base64'), Buffer.from(tokenIv, 'base64')),
-      ])
-        .then(([
-          hash,
-          token,
-        ]) => {
-          hash = hash.toString('utf8');
-          token = token.toString('base64');
-
-          phash(password).verifyAgainst(hash, (err, verified) => {
-            if (!err) {
-              if (verified) {
-                accept({
-                  id,
-                  email,
-                  hash,
-                  token,
-                });
-              } else {
-                const err = new Error('invalid password');
-                err.code = 'EAUTH';
-                reject(err);
-              }
-            } else {
-              reject(err);
-            }
-          });
-        });
-    } else {
-      reject(err);
-    }
-  });
-});
 const _requestUserFromEmailToken = (email, t) => new Promise((accept, reject) => {
   s3.getObject({
     Bucket: BUCKET,

@@ -566,7 +566,7 @@ app.put('/p', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-app.put('/f*', (req, res, next) => {
+app.put('/f/:filename', (req, res, next) => {
   const authorization = req.get('authorization') || '';
   const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
   if (match) {
@@ -575,13 +575,13 @@ app.put('/f*', (req, res, next) => {
 
     _requestUserFromEmailToken(email, token)
       .then(() => {
-        const p = req.params[0];
-        const key = path.join('_files', email, meaningful().toLowerCase(), p);
+        const {filename} = req.params;
+        const key = path.join('_files', email, meaningful().toLowerCase(), filename);
 
         s3.upload({
           Bucket: BUCKET,
           Key: key,
-          ContentType: mime.getType(p),
+          ContentType: mime.getType(filename),
           Body: req,
         }, (err, data) => {
           if (!err) {

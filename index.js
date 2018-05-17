@@ -649,7 +649,12 @@ app.put('/d/:dirname', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-const proxy = httpProxy.createProxyServer({});
+const proxy = httpProxy.createProxyServer({
+  autoRewrite: true,
+  hostRewrite: true,
+  protocolRewrite: true,
+  changeOrigin: true,
+});
 app.get('/s', (req, res, next) => {
   req.url = '/servers';
 

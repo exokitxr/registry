@@ -33,6 +33,13 @@ const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const redis = require('redis');
 
+const PORT = process.env['PORT'] || 8000;
+const BUCKET = 'files.webmr.io';
+const HOST = 'https://registry.webmr.io';
+const FILES_HOST = 'https://files.webmr.io';
+const MULTIPLAYER_HOST = 'https://multiplayer.webmr.io';
+const CIPHER = 'AES-256-CTR';
+
 const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HASH_KEY, REDIS_URL} = process.env;
 if (!AWS_ACCESS_KEY_ID) {
   console.warn('need AWS_ACCESS_KEY_ID');
@@ -58,13 +65,6 @@ const rc = redis.createClient(REDIS_URL, {
 });
 const rcGetAsync = promisify(rc.get.bind(rc));
 const rcSetAsync = promisify(rc.set.bind(rc));
-
-const PORT = process.env['PORT'] || 8000;
-const BUCKET = 'files.webmr.io';
-const HOST = 'https://registry.webmr.io';
-const FILES_HOST = 'https://files.webmr.io';
-const MULTIPLAYER_HOST = 'https://multiplayer.webmr.io';
-const CIPHER = 'AES-256-CTR';
 
 const _encrypt = (d, iv) => new Promise((accept, reject) => {
   const cipher = crypto.createCipheriv(CIPHER, secret, iv);

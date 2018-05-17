@@ -705,78 +705,104 @@ app.get('/*', (req, res, next) => {
   s3.listObjects({
     Bucket: BUCKET,
     Prefix: p,
+    Delimiter: '/',
   }, (err, data) => {
     if (!err) {
-      const contents = data.Contents;
-      const regex = new RegExp('(' + escapeRegExp(p) + '[^/]+?(?:/|$))');
+      const {CommonPrefixes: commonPrefixes} = data;
+      commonPrefixes.push({
+        Prefix: p,
+      });
+
       const files = [];
       const filesIndex = {};
-      for (let i = 0; i < contents.length; i++) {
-        const content = contents[i];
-        const {Key: key, LastModified: timestamp} = content;
-        let match;
-        if (match = key.match(regex)) {
-          const name = match[1];
+      Promise.all(commonPrefixes.map(commonPrefix => new Promise((accept, reject) => {
+        s3.listObjects({
+          Bucket: BUCKET,
+          Prefix: commonPrefix.Prefix,
+        }, (err, data) => {
+          if (!err) {
+            const {Contents: contents} = data;
 
-          if (!filesIndex[name]) {
-            files.push({
-              name,
-              timestamp,
-            });
-            filesIndex[name] = true;
-          }
-        }
-      }
-      const isDirectory = s => /\/$/.test(s);
-      const pHtml = (() => {
-        let result = `/<a href="${encodeURI(HOST)}/">root</a>/`;
-        const components = p.split('/');
-        let acc = `${HOST}/`;
-        for (let i = 0; i < components.length; i++) {
-          const component = components[i];
+            const regex = new RegExp('(' + escapeRegExp(p) + '[^/]+?(?:/|$))');
+            for (let i = 0; i < contents.length; i++) {
+              const content = contents[i];
+              const {Key: key, LastModified: timestamp} = content;
+              let match;
+              if (match = key.match(regex)) {
+                const name = match[1];
 
-          if (component) {
-            acc += component + '/';
-            const uri = encodeURI(acc);
-            result += `<a href="${uri}">${component}</a>/`;
-          }
-        }
-        return result;
-      })();
-      let html = `<!doctype html><html><body><h1>${pHtml}</h1>`;
-      files.sort((a, b) => {
-        const aIsDirectory = isDirectory(a.name);
-        const bIsDirectory = isDirectory(b.name);
-        let diff = +bIsDirectory - +aIsDirectory;
-        if (diff !== 0) {
-          return diff;
-        } else {
-          let diff = (aIsDirectory || bIsDirectory) ? (+b.timestamp - +a.timestamp) : 0;
-          if (diff !== 0) {
-            return diff;
+                if (!filesIndex[name]) {
+                  files.push({
+                    name,
+                    timestamp,
+                  });
+                  filesIndex[name] = true;
+                }
+              }
+            }
+
+            accept();
           } else {
-            return a.name.localeCompare(b.name);
+            reject(err);
           }
-        }
-      });
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const {name} = file;
+        });
+      })))
+        .then(() => {
+          const isDirectory = s => /\/$/.test(s);
+          const pHtml = (() => {
+            let result = `/<a href="${encodeURI(HOST)}/">root</a>/`;
+            const components = p.split('/');
+            let acc = `${HOST}/`;
+            for (let i = 0; i < components.length; i++) {
+              const component = components[i];
 
-        let uri;
-        let text;
-        if (isDirectory(name)) {
-          uri = encodeURI(`${HOST}/${name}`);
-          text = '📁\xa0/' + escape(name);
-        } else {
-          uri = encodeURI(`${FILES_HOST}/${name}`);
-          text = '💾\xa0/' + escape(name);
-        }
-        html += `<a href="${uri}">${text}</a><br>`;
-      }
-      html += `</body></html>`;
-      res.type('text/html');
-      res.end(html);
+              if (component) {
+                acc += component + '/';
+                const uri = encodeURI(acc);
+                result += `<a href="${uri}">${component}</a>/`;
+              }
+            }
+            return result;
+          })();
+          let html = `<!doctype html><html><body><h1>${pHtml}</h1>`;
+          files.sort((a, b) => {
+            const aIsDirectory = isDirectory(a.name);
+            const bIsDirectory = isDirectory(b.name);
+            let diff = +bIsDirectory - +aIsDirectory;
+            if (diff !== 0) {
+              return diff;
+            } else {
+              let diff = (aIsDirectory || bIsDirectory) ? (+b.timestamp - +a.timestamp) : 0;
+              if (diff !== 0) {
+                return diff;
+              } else {
+                return a.name.localeCompare(b.name);
+              }
+            }
+          });
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const {name} = file;
+
+            let uri;
+            let text;
+            if (isDirectory(name)) {
+              uri = encodeURI(`${HOST}/${name}`);
+              text = '📁\xa0/' + escape(name);
+            } else {
+              uri = encodeURI(`${FILES_HOST}/${name}`);
+              text = '💾\xa0/' + escape(name);
+            }
+            html += `<a href="${uri}">${text}</a><br>`;
+          }
+          html += `</body></html>`;
+          res.type('text/html');
+          res.end(html);
+        })
+        .catch(err => {
+          res.status(500);
+          res.end(err.stack);
+        });
     } else {
       res.status(500);
       res.end(err.stack);

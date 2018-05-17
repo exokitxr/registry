@@ -6,11 +6,16 @@ const os = require('os');
 const zlib = require('zlib');
 const crypto = require('crypto');
 const child_process = require('child_process');
+const util = require('util');
+const {promisify} = util;
 
 const express = require('express');
 const tmp = require('tmp');
 const bodyParser = require('body-parser');
 const bodyParserJson = bodyParser.json();
+const bodyParserBuffer = bodyParser.raw({
+  type: 'application/octet-stream',
+});
 const mime = require('mime');
 const semver = require('semver');
 const phash = require('password-hash-and-salt');
@@ -23,11 +28,12 @@ const rollupPluginCommonJs = require('rollup-plugin-commonjs');
 const rollupPluginJson = require('rollup-plugin-json');
 const ignore = require('ignore');
 const {meaningful} = require('meaningful-string');
+const httpProxy = require('http-proxy');
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
-const httpProxy = require('http-proxy');
+const redis = require('redis');
 
-const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HASH_KEY} = process.env;
+const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HASH_KEY, REDIS_URL} = process.env;
 if (!AWS_ACCESS_KEY_ID) {
   console.warn('need AWS_ACCESS_KEY_ID');
   process.exit(1);
@@ -40,9 +46,18 @@ if (!HASH_KEY) {
   console.warn('need HASH_KEY');
   process.exit(1);
 }
+if (!REDIS_URL) {
+  console.warn('need REDIS_URL');
+  process.exit(1);
+}
 const secret = crypto.createHmac('sha256', HASH_KEY)
   .update(HASH_KEY)
   .digest();
+const rc = redis.createClient(REDIS_URL, {
+  return_buffers: true,
+});
+const rcGetAsync = promisify(rc.get.bind(rc));
+const rcSetAsync = promisify(rc.set.bind(rc));
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
@@ -841,6 +856,31 @@ app.delete('/s/:name', (req, res, next) => {
   proxy.web(req, res, {
     target: MULTIPLAYER_HOST,
   });
+});
+app.get('/u/:id/:key', async (req, res, next) => {
+  const {id, key} = req.params;
+  const k = id + '/' + key;
+  const b = await rcGetAsync(k);
+
+  if (b !== null) {
+    res.type('application/octet-stream');
+    res.end(b);
+  } else {
+    res.status(404);
+    res.end(http.STATUS_CODES[404]);
+  }
+});
+app.put('/u/:id/:key', bodyParserBuffer, async (req, res, next) => {
+  if (Buffer.isBuffer(req.body)) {
+    const {id, key} = req.params;
+    const k = id + '/' + key;
+    await rcSetAsync(k, req.body);
+
+    res.json({});
+  } else {
+    res.status(400);
+    res.end(http.STATUS_CODES[400]);
+  }
 });
 app.get('/multiplayer', (req, res, next) => {
   res.redirect(MULTIPLAYER_HOST);

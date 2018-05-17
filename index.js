@@ -678,6 +678,9 @@ app.delete('/s/:name', (req, res, next) => {
     target: MULTIPLAYER_HOST,
   });
 });
+app.get('/multiplayer', (req, res, next) => {
+  res.redirect(MULTIPLAYER_HOST);
+});
 app.get('/*', (req, res, next) => {
   let p = req.params[0];
   if (!/\/$/.test(p)) {

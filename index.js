@@ -674,7 +674,7 @@ app.put('/f/:filename', (req, res, next) => {
     _requestUserFromEmailToken(email, token)
       .then(() => {
         const {filename} = req.params;
-        const key = path.join('_files', email, meaningful().toLowerCase(), filename);
+        const key = '_files/' + email + '/' + meaningful().toLowerCase() + '/' + filename;
 
         s3.upload({
           Bucket: BUCKET,

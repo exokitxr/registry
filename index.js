@@ -662,8 +662,17 @@ app.get('/s', (req, res, next) => {
     target: MULTIPLAYER_HOST,
   });
 });
-app.post('/s', (req, res, next) => {
-  req.url = '/servers';
+app.post('/s/:name', (req, res, next) => {
+  const {name} = req.params;
+  req.url = `/servers/${name}`;
+
+  proxy.web(req, res, {
+    target: MULTIPLAYER_HOST,
+  });
+});
+app.delete('/s/:name', (req, res, next) => {
+  const {name} = req.params;
+  req.url = `/servers/${name}`;
 
   proxy.web(req, res, {
     target: MULTIPLAYER_HOST,

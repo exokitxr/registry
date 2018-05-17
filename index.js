@@ -664,7 +664,7 @@ app.delete('/p/:name/:version', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-app.put('/f/:filename', (req, res, next) => {
+const _uploadFile = (req, res, next) => {
   const authorization = req.get('authorization') || '';
   const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
   if (match) {
@@ -674,7 +674,11 @@ app.put('/f/:filename', (req, res, next) => {
     _requestUserFromEmailToken(email, token)
       .then(() => {
         const {filename} = req.params;
-        const key = '_files/' + email + '/' + meaningful().toLowerCase() + '/' + filename;
+        let {name} = req.params;
+        if (!name) {
+          name = meaningful().toLowerCase();
+        }
+        const key = '_files/' + email + '/' + name + '/' + filename;
 
         s3.upload({
           Bucket: BUCKET,
@@ -705,7 +709,9 @@ app.put('/f/:filename', (req, res, next) => {
     res.status(401);
     res.end(http.STATUS_CODES[401]);
   }
-});
+};
+app.put('/f/:filename', _uploadFile);
+app.put('/f/:filename/:name', _uploadFile);
 app.delete('/f/:name', (req, res, next) => {
   const {name} = req.params;
 
@@ -762,7 +768,7 @@ app.delete('/f/:name', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-app.put('/d/:dirname', (req, res, next) => {
+const _uploadDirectory = (req, res, next) => {
   const {dirname} = req.params;
 
   const authorization = req.get('authorization') || '';
@@ -787,7 +793,11 @@ app.put('/d/:dirname', (req, res, next) => {
 
           ws.on('finish', async () => {
             const ig = ignore();
-            const key = path.join('_files', email, meaningful().toLowerCase(), dirname);
+            let {name} = req.params;
+            if (!name) {
+              name = meaningful().toLowerCase();
+            }
+            const key = '_files/' + email + '/' + name + '/' + dirname;
             await _uploadModule('/', p, ig, key);
 
             res.json({
@@ -800,7 +810,9 @@ app.put('/d/:dirname', (req, res, next) => {
     res.status(401);
     res.end(http.STATUS_CODES[401]);
   }
-});
+};
+app.put('/d/:dirname', _uploadDirectory);
+app.put('/d/:dirname/:name', _uploadDirectory);
 const proxy = httpProxy.createProxyServer({
   autoRewrite: true,
   hostRewrite: true,

@@ -580,6 +580,90 @@ app.put('/p', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
+app.delete('/p/:name/:version', (req, res, next) => {
+  const {name, version} = req.params;
+
+  const authorization = req.get('authorization') || '';
+  const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
+  if (match) {
+    const email = match[1];
+    const token = match[2];
+
+    _requestUserFromEmailToken(email, token)
+      .then(user => {
+        _getProject(name)
+          .then(projectSpec => {
+            if (projectSpec) {
+              let index = -1;
+              if (projectSpec.owner === user.id && ((index = projectSpec.versions.indexOf(version)) !== -1)) {
+                const {owner, versions} = projectSpec;
+                versions.splice(index, 1);
+
+                _setProject(name, {
+                  name,
+                  owner,
+                  versions,
+                })
+                  .then(() => {
+                    s3.listObjects({
+                      Bucket: BUCKET,
+                      Prefix: `${name}/${version}/`,
+                    }, (err, data) => {
+                      if (!err) {
+                        const {Contents: contents} = data;
+                        s3.deleteObjects({
+                          Bucket: BUCKET,
+                          Delete: {
+                            Objects: contents.map(({Key}) => ({Key})),
+                          },
+                        }, err => {
+                          if (!err) {
+                            res.json({});
+                          } else {
+                            res.status(500);
+                            res.end(err.stack);
+                          }
+                        });
+                      } else {
+                        res.status(500);
+                        res.end(err.stack);
+                      }
+                    });
+                  })
+                  .catch(err => {
+                    res.status(500);
+                    res.end(err.stack);
+                  });
+              } else if (projectSpec.owner !== user.id) {
+                res.status(403);
+                res.end(http.STATUS_CODES[403]);
+              } else if (index === -1) {
+                res.status(404);
+                res.end(http.STATUS_CODES[404]);
+              } else {
+                res.status(500);
+                res.end(http.STATUS_CODES[500]);
+              }
+            } else {
+              res.status(404);
+              res.end(http.STATUS_CODES[404]);
+            }
+          });
+      })
+      .catch(err => {
+        if (err.code === 'EAUTH') {
+          res.status(403);
+          res.end(http.STATUS_CODES[403]);
+        } else {
+          res.status(500);
+          res.end(err.stack);
+        }
+      });
+  } else {
+    res.status(401);
+    res.end(http.STATUS_CODES[401]);
+  }
+});
 app.put('/f/:filename', (req, res, next) => {
   const authorization = req.get('authorization') || '';
   const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);

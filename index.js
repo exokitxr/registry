@@ -34,7 +34,7 @@ const secret = crypto.createHmac('sha256', AWS_SECRET_ACCESS_KEY)
 
 const PORT = process.env['PORT'] || 8000;
 const BUCKET = 'files.webmr.io';
-const HOST = 'https://registry.webmr.io';
+const HOST = 'http://127.0.0.1:8000';
 const FILES_HOST = 'https://files.webmr.io';
 const MULTIPLAYER_HOST = 'https://multiplayer.webmr.io';
 const CIPHER = 'AES-256-CTR';
@@ -649,14 +649,6 @@ app.put('/d/:dirname', (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 });
-const servers = [];
-const ports = (() => {
-  const result = [];
-  for (let i = 0; i < 9000) {
-    result.push(i);
-  }
-  return result;
-})();
 const proxy = httpProxy.createProxyServer({});
 app.get('/s', (req, res, next) => {
   req.url = '/servers';

@@ -707,19 +707,23 @@ app.get('/*', (req, res, next) => {
     Prefix: p,
   }, (err, data) => {
     if (!err) {
-      const keys = data.Contents.map(({Key}) => Key);
+      const contents = data.Contents;
       const regex = new RegExp('(' + escapeRegExp(p) + '[^/]+?(?:/|$))');
       const files = [];
       const filesIndex = {};
-      for (let i = 0; i < keys.length; i++) {
-        const key = keys[i];
+      for (let i = 0; i < contents.length; i++) {
+        const content = contents[i];
+        const {Key: key, LastModified: timestamp} = content;
         let match;
         if (match = key.match(regex)) {
-          const file = match[1];
+          const name = match[1];
 
-          if (!filesIndex[file]) {
-            files.push(file);
-            filesIndex[file] = true;
+          if (!filesIndex[name]) {
+            files.push({
+              name,
+              timestamp,
+            });
+            filesIndex[name] = true;
           }
         }
       }
@@ -741,23 +745,32 @@ app.get('/*', (req, res, next) => {
       })();
       let html = `<!doctype html><html><body><h1>${pHtml}</h1>`;
       files.sort((a, b) => {
-        const diff = +isDirectory(b) - +isDirectory(a);
+        const aIsDirectory = isDirectory(a.name);
+        const bIsDirectory = isDirectory(b.name);
+        let diff = +bIsDirectory - +aIsDirectory;
         if (diff !== 0) {
           return diff;
         } else {
-          return a.localeCompare(b);
+          let diff = (aIsDirectory || bIsDirectory) ? (+b.timestamp - +a.timestamp) : 0;
+          if (diff !== 0) {
+            return diff;
+          } else {
+            return a.name.localeCompare(b.name);
+          }
         }
       });
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const {name} = file;
+
         let uri;
         let text;
-        if (isDirectory(file)) {
-          uri = encodeURI(`${HOST}/${file}`);
-          text = '📁\xa0/' + escape(file);
+        if (isDirectory(name)) {
+          uri = encodeURI(`${HOST}/${name}`);
+          text = '📁\xa0/' + escape(name);
         } else {
-          uri = encodeURI(`${FILES_HOST}/${file}`);
-          text = '💾\xa0/' + escape(file);
+          uri = encodeURI(`${FILES_HOST}/${name}`);
+          text = '💾\xa0/' + escape(name);
         }
         html += `<a href="${uri}">${text}</a><br>`;
       }

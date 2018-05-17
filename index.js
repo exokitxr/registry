@@ -27,9 +27,21 @@ const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const httpProxy = require('http-proxy');
 
-const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY} = process.env;
-const secret = crypto.createHmac('sha256', AWS_SECRET_ACCESS_KEY)
-  .update(AWS_ACCESS_KEY_ID)
+const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HASH_KEY} = process.env;
+if (!AWS_ACCESS_KEY_ID) {
+  console.warn('need AWS_ACCESS_KEY_ID');
+  process.exit(1);
+}
+if (!AWS_SECRET_ACCESS_KEY) {
+  console.warn('need AWS_SECRET_ACCESS_KEY');
+  process.exit(1);
+}
+if (!HASH_KEY) {
+  console.warn('need HASH_KEY');
+  process.exit(1);
+}
+const secret = crypto.createHmac('sha256', HASH_KEY)
+  .update(HASH_KEY)
   .digest();
 
 const PORT = process.env['PORT'] || 8000;

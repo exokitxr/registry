@@ -163,6 +163,11 @@ const _setProject = (project, projectSpec) => new Promise((accept, reject) => {
 });
 
 const app = express();
+app.all('*', (req, res, next) => {
+  _cors(req, res);
+
+  next();
+});
 app.post('/l', bodyParserJson, (req, res, next) => {
   if (req.body && typeof req.body.email === 'string' && typeof req.body.password === 'string') {
     s3.getObject({
@@ -1004,12 +1009,12 @@ app.get('/*', (req, res, next) => {
 function escapeRegExp(str) {
   return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&');
 }
-/* const _cors = (req, res) => {
-  res.set('Access-Control-Allow-Origin', '**');
+const _cors = (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Allow-Credentials', 'true');
-}; */
+};
 http.createServer(app)
   .listen(PORT);
 

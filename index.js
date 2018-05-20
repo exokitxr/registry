@@ -262,6 +262,38 @@ app.post('/l', bodyParserJson, (req, res, next) => {
         res.end(err.stack);
       }
     });
+  } else if (req.body && typeof req.body.email === 'string' && typeof req.body.token === 'string') {
+    s3.getObject({
+      Bucket: BUCKET,
+      Key: path.join('_users', req.body.email),
+    }, (err, result) => {
+      if (!err) {
+        const j = JSON.parse(result.Body.toString('utf8'));
+        const {id, email, hashEnc, hashIv, tokenEnc, tokenIv} = j;
+
+        _decrypt(Buffer.from(tokenEnc, 'base64'), Buffer.from(tokenIv, 'base64'))
+          .then(token => {
+            token = token.toString('base64');
+
+            if (token === req.body.token) {
+              res.json({
+                id,
+                email,
+                token,
+              });
+            } else {
+              res.status(403);
+              res.end(http.STATUS_CODES[403]);
+            }
+          });
+      } else if (err.code === 'NoSuchKey') {
+        res.status(404);
+        res.end(http.STATUS_CODES[404]);
+      } else {
+        res.status(500);
+        res.end(err.stack);
+      }
+    });
   } else {
     res.status(400);
     res.end(http.STATUS_CODES[400]);

@@ -33,7 +33,7 @@ const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const redis = require('redis');
 
-const PORT = process.env['PORT'] || 8000;
+const PORT = process.env['PORT'] || 9000;
 const BUCKET = 'files.webmr.io';
 const HOST = 'https://registry.webmr.io';
 const FILES_HOST = 'https://files.webmr.io';

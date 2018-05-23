@@ -894,9 +894,9 @@ app.delete('/s/:name', (req, res, next) => {
     target: MULTIPLAYER_HOST,
   });
 });
-app.get('/u/:id/:key', async (req, res, next) => {
-  const {id, key} = req.params;
-  const k = id + '/' + key;
+app.get('/u/:username/:key', async (req, res, next) => {
+  const {username, key} = req.params;
+  const k = username + '/' + key;
   const b = await rcGetAsync(k);
 
   if (b !== null) {
@@ -907,13 +907,36 @@ app.get('/u/:id/:key', async (req, res, next) => {
     res.end(http.STATUS_CODES[404]);
   }
 });
-app.put('/u/:id/:key', bodyParserBuffer, async (req, res, next) => {
+app.put('/u/:username/:key', bodyParserBuffer, (req, res, next) => {
   if (Buffer.isBuffer(req.body)) {
-    const {id, key} = req.params;
-    const k = id + '/' + key;
-    await rcSetAsync(k, req.body);
+    const authorization = req.get('authorization') || '';
+    const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
+    if (match) {
+      const username = match[1];
+      const token = match[2];
 
-    res.json({});
+      _requestUserFromUsernameToken(username, token)
+        .then(async user => {
+          const {username, key} = req.params;
+
+          if (user.username === username) {
+            const k = username + '/' + key;
+            await rcSetAsync(k, req.body);
+
+            res.json({});
+          } else {
+            res.status(403);
+            res.end(http.STATUS_CODES[403]);
+          }
+        })
+        .catch(err => {
+          res.status(500);
+          res.end(err.stack);
+        });
+    } else {
+      res.status(401);
+      res.end(http.STATUS_CODES[401]);
+    }
   } else {
     res.status(400);
     res.end(http.STATUS_CODES[400]);

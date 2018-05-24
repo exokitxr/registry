@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const url = require('url');
 const os = require('os');
 const zlib = require('zlib');
 const crypto = require('crypto');
@@ -17,6 +18,7 @@ const bodyParserBuffer = bodyParser.raw({
   type: 'application/octet-stream',
 });
 const mime = require('mime');
+const parseJsonResponse = require('parse-json-response');
 const semver = require('semver');
 const phash = require('password-hash-and-salt');
 const tarFs = require('tar-fs');
@@ -41,6 +43,7 @@ const MULTIPLAYER_HOST = 'https://multiplayer.webmr.io';
 const CIPHER = 'AES-256-CTR';
 const XRID_HOSTS = ['id.webmr.io'];
 const XRMULTIPLAYER_HOSTS = ['multiplayer.webmr.io'];
+const XRURLS_URL = `https://www.reddit.com/r/exokit.json`;
 
 const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HASH_KEY, REDIS_URL} = process.env;
 if (!AWS_ACCESS_KEY_ID) {
@@ -170,11 +173,31 @@ app.all('*', (req, res, next) => {
 
   next();
 });
+let xrUrls = [];
+const _refreshXrUrls = () => {
+  const {hostname, path} = url.parse(XRURLS_URL);
+  const req = https.get({
+    hostname,
+    path,
+    encoding: 'utf8',
+  }, res => {
+    parseJsonResponse(res, (err, j) => {
+      if (!err) {
+        xrUrls = j.data.children.map(child => child.data.url);
+      } else {
+        console.warn(err);
+      }
+
+      setInterval(_refreshXrUrls, 60 * 1000);
+    });
+  });
+};
+_refreshXrUrls();
 app.get('/q', (req, res, next) => {
   res.json({
     xridHosts: XRID_HOSTS,
     xrmultiplayerHosts: XRMULTIPLAYER_HOSTS,
-    xrUrls: [],
+    xrUrls,
   });
 });
 app.post('/l', bodyParserJson, (req, res, next) => {

@@ -25,6 +25,7 @@
     "ignore": "^3.3.8",
     "meaningful-string": "^1.2.1",
     "mime": "^2.3.1",
+    "parse-json-response": "^1.0.1",
     "password-hash-and-salt": "^0.1.4",
     "promise-concurrency": "^1.1.0",
     "redis": "^2.8.0",

@@ -1080,7 +1080,9 @@ const _cors = (req, res) => {
   res.set('Access-Control-Allow-Credentials', 'true');
 };
 http.createServer(app)
-  .listen(PORT);
+  .listen(PORT, () => {
+    console.log(`http://127.0.0.1:${PORT}/`);
+  });
 
 process.on('uncaughtException', err => {
   console.warn(err);

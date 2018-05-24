@@ -39,6 +39,8 @@ const HOST = 'https://registry.webmr.io';
 const FILES_HOST = 'https://files.webmr.io';
 const MULTIPLAYER_HOST = 'https://multiplayer.webmr.io';
 const CIPHER = 'AES-256-CTR';
+const XRID_HOSTS = ['id.webmr.io'];
+const XRMULTIPLAYER_HOSTS = ['multiplayer.webmr.io'];
 
 const {AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, HASH_KEY, REDIS_URL} = process.env;
 if (!AWS_ACCESS_KEY_ID) {
@@ -167,6 +169,13 @@ app.all('*', (req, res, next) => {
   _cors(req, res);
 
   next();
+});
+app.get('/q', (req, res, next) => {
+  res.json({
+    xridHosts: XRID_HOSTS,
+    xrmultiplayerHosts: XRMULTIPLAYER_HOSTS,
+    xrUrls: [],
+  });
 });
 app.post('/l', bodyParserJson, (req, res, next) => {
   if (req.body && typeof req.body.username === 'string' && typeof req.body.password === 'string') {

@@ -188,7 +188,7 @@ const _refreshXrUrls = () => {
         console.warn(err);
       }
 
-      setInterval(_refreshXrUrls, 60 * 1000);
+      setTimeout(_refreshXrUrls, 60 * 1000);
     });
   });
 };

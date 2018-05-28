@@ -834,7 +834,10 @@ app.get('/f', (req, res, next) => {
 
                     let match;
                     if (match = key.match(regex)) {
-                      files.push(FILES_HOST + '/' + match[1]);
+                      files.push({
+                        name: FILES_HOST + '/' + match[1],
+                        type: mime.getType(match[1]),
+                      });
                       break;
                     }
                   }

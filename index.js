@@ -794,6 +794,75 @@ const _uploadFile = (req, res, next) => {
     res.end(http.STATUS_CODES[401]);
   }
 };
+app.get('/f', (req, res, next) => {
+  const authorization = req.get('authorization') || '';
+  const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
+  if (match) {
+    const username = match[1];
+    const token = match[2];
+
+    _requestUserFromUsernameToken(username, token)
+      .then(() => {
+        const p = '_files/' + username + '/';
+
+        s3.listObjects({
+          Bucket: BUCKET,
+          Prefix: p,
+          Delimiter: '/',
+        }, (err, data) => {
+          if (!err) {
+            const {CommonPrefixes: commonPrefixes} = data;
+
+            const files = [];
+            Promise.all(commonPrefixes.map(commonPrefix => new Promise((accept, reject) => {
+              const {Prefix} = commonPrefix;
+
+              // const directory = Prefix.match(/\/([^\/]+)\/$/)[1];
+
+              s3.listObjects({
+                Bucket: BUCKET,
+                Prefix,
+                // MaxKeys: 1,
+              }, (err, data) => {
+                if (!err) {
+                  const {Contents: contents} = data;
+
+                  const regex = new RegExp('^(' + escapeRegExp(p) + '[^/]+?/[^/]+)$');
+                  for (let i = 0; i < contents.length; i++) {
+                    const content = contents[i];
+                    const {Key: key} = content;
+
+                    let match;
+                    if (match = key.match(regex)) {
+                      files.push(FILES_HOST + '/' + match[1]);
+                      break;
+                    }
+                  }
+
+                  accept();
+                } else {
+                  reject(err);
+                }
+              });
+            })))
+              .then(() => {
+                res.json(files);
+              });
+          } else {
+            res.status(500);
+            res.end(err.stack);
+          }
+        });
+      })
+      .catch(err => {
+        res.status(500);
+        res.end(err.stack);
+      });
+  } else {
+    res.status(401);
+    res.end(http.STATUS_CODES[401]);
+  }
+});
 app.put('/f/:filename', _uploadFile);
 app.put('/f/:filename/:name', _uploadFile);
 app.delete('/f/:name', (req, res, next) => {

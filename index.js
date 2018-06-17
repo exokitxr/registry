@@ -828,7 +828,7 @@ app.get('/f', (req, res, next) => {
                 if (!err) {
                   const {Contents: contents} = data;
 
-                  const regex = new RegExp('^(' + escapeRegExp(p) + '[^/]+?/[^/]+)$');
+                  const regex = new RegExp('^(' + escapeRegExp(p) + '([^/]+?)/[^/]+)$');
                   for (let i = 0; i < contents.length; i++) {
                     const content = contents[i];
                     const {Key: key} = content;
@@ -836,7 +836,9 @@ app.get('/f', (req, res, next) => {
                     let match;
                     if (match = key.match(regex)) {
                       files.push({
-                        name: FILES_HOST + '/' + match[1],
+                        username,
+                        name: match[2],
+                        url: FILES_HOST + '/' + match[1],
                         type: req.get('Content-Type') || mime.getType(match[1]),
                       });
                       break;

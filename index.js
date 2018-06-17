@@ -70,6 +70,7 @@ const rc = redis.createClient(REDIS_URL, {
 });
 const rcGetAsync = promisify(rc.get.bind(rc));
 const rcSetAsync = promisify(rc.set.bind(rc));
+const rcDelAsync = promisify(rc.del.bind(rc));
 
 const _encrypt = (d, iv) => new Promise((accept, reject) => {
   const cipher = crypto.createCipheriv(CIPHER, secret, iv);
@@ -1044,6 +1045,36 @@ app.put('/u/:username/:key', bodyParserBuffer, (req, res, next) => {
   } else {
     res.status(400);
     res.end(http.STATUS_CODES[400]);
+  }
+});
+app.delete('/u/:username/:key', (req, res, next) => {
+  const authorization = req.get('authorization') || '';
+  const match = authorization.match(/^Token\s+(\S+)\s+(\S+)$/i);
+  if (match) {
+    const username = match[1];
+    const token = match[2];
+
+    _requestUserFromUsernameToken(username, token)
+      .then(async user => {
+        const {username, key} = req.params;
+
+        if (user.username === username) {
+          const k = username + '/' + key;
+          await rcDelAsync(k);
+
+          res.json({});
+        } else {
+          res.status(403);
+          res.end(http.STATUS_CODES[403]);
+        }
+      })
+      .catch(err => {
+        res.status(500);
+        res.end(err.stack);
+      });
+  } else {
+    res.status(401);
+    res.end(http.STATUS_CODES[401]);
   }
 });
 app.get('/multiplayer', (req, res, next) => {
